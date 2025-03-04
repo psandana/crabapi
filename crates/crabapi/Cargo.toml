@@ -2,3 +2,7 @@
 name = "crabapi"
 version.workspace = true
 edition.workspace = true
+
+[dependencies]
+http = "1.2.0"
+reqwest = "0.12.12"
