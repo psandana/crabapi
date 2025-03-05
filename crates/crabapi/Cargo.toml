@@ -7,3 +7,4 @@ edition.workspace = true
 http = "1.2.0"
 reqwest = "0.12.12"
 tokio = { version = "1", features = ["full"] }
+clap = "4.5.31"
