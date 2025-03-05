@@ -24,7 +24,9 @@ impl Cli {
     pub fn new() -> Cli {
         Cli {
             client: Client::new(),
-            url_arg: Arg::new("url").help("Request URL").required_unless_present("gui"),
+            url_arg: Arg::new("url")
+                .help("Request URL")
+                .required_unless_present("gui"),
             query_arg: Arg::new("query")
                 .short('Q')
                 .long("query")
@@ -65,8 +67,8 @@ impl Cli {
             .get_matches();
 
         if matches.contains_id("gui") {
-          crate::gui::run_gui();
-          return Ok(());
+            crate::gui::run_gui();
+            return Ok(());
         }
 
         let mut query = HashMap::new();

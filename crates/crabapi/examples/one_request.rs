@@ -1,6 +1,7 @@
 use crabapi::core::requests::{build_request, send_requests};
 use http::{HeaderMap, Method};
 use reqwest::{Body, Client};
+use std::collections::HashMap;
 use tokio;
 
 #[tokio::main]
@@ -10,7 +11,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // send 1 request
     let req = build_request(
         &client,
-        "http://localhost:7878".to_string(),
+        "http://localhost:7878",
+        HashMap::new(),
         Method::GET,
         HeaderMap::new(),
         Body::from("Get Request"),
