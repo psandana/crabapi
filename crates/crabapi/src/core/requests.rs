@@ -24,6 +24,28 @@ pub fn send_requests(requests: Vec<RequestBuilder>) -> Vec<JoinHandle<Result<Res
     handles
 }
 
+pub async fn print_response(handle: JoinHandle<Result<Response, Error>>) -> Result<(), Error> {
+    let response = handle.await.unwrap()?;
+    let headers = response.headers().clone();
+    let url = response.url().clone();
+    let status = response.status().clone();
+    let version = response.version().clone();
+    let body = response.text().await?;
+    
+    print!("{url} - {status} - {version:#?} - \n");
+    for header in headers.iter() {
+        println!("\t{:#?}: {:#?}", header.0, header.1);
+    }
+    println!();
+    if body.len() > 80 {
+        println!("Body:\n{}\n...[truncated]", body[0..79].to_string());
+    } else {
+        println!("Body:\n{}", body);
+    }
+    
+    Ok(())
+}
+
 // --------------
 // -- EXAMPLE: --
 // --------------

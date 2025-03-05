@@ -1,8 +1,9 @@
-use crate::core::requests::{build_request, send_requests};
+use crate::core::requests::{build_request, print_response, send_requests};
 use clap::{Arg, ArgAction, Command};
 use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use reqwest::{Body, Client};
 use std::error::Error;
+use std::ptr::read;
 
 pub struct Cli {
     client: Client,
@@ -65,8 +66,7 @@ impl Cli {
 
         let handles = send_requests(vec![request]);
         for handle in handles {
-            let text = handle.await??.text().await?;
-            println!("Response body: {:?}\n", text);
+            print_response(handle).await?;
         }
         Ok(())
     }
