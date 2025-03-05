@@ -6,3 +6,4 @@ edition.workspace = true
 [dependencies]
 http = "1.2.0"
 reqwest = "0.12.12"
+clap = "4.5.31"
