@@ -13,6 +13,12 @@ pub struct Cli {
     headers_arg: Arg,
 }
 
+impl Default for Cli {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Cli {
     pub fn new() -> Cli {
         Cli {
