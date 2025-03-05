@@ -4,7 +4,7 @@ use tokio::task::JoinHandle;
 
 pub fn build_request(
     client: &Client,
-    url: String,
+    url: &String,
     method: Method,
     headers: HeaderMap,
     body: Body,

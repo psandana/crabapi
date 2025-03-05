@@ -1,30 +1,51 @@
+use crate::core::requests::{build_request, send_requests};
 use clap::{Arg, Command};
-use http::Method;
+use http::{HeaderMap, Method};
+use reqwest::{Body, Client};
 use std::error::Error;
 
-pub fn main() -> Result<(), Box<dyn Error>> {
-    let method = Arg::new("method")
-        .short('X')
-        .long("method")
-        .value_name("METHOD")
-        .help("HTTP method(GET, POST)")
-        .default_value("GET");
+pub struct Cli {
+    client: Client,
+    url_arg: Arg,
+    method_arg: Arg,
+}
 
-    let url = Arg::new("url").help("Request URL").required(true);
+impl Cli {
+    pub fn new() -> Cli {
+        Cli {
+            client: Client::new(),
+            url_arg: Arg::new("url").help("Request URL").required(true),
+            method_arg: Arg::new("method")
+                .short('X')
+                .long("method")
+                .value_name("METHOD")
+                .help("HTTP method(GET, POST)")
+                .default_value("GET"),
+        }
+    }
 
-    let matches = Command::new("crabapi")
-        .version("0.1.0")
-        .author("Microsoft")
-        .about("Postman analog")
-        .arg(method)
-        .arg(url)
-        .get_matches();
+    pub async fn run(self) -> Result<(), Box<dyn Error>> {
+        let matches = Command::new("crabapi")
+            .version("0.1.0")
+            .author("Microsoft")
+            .about("Postman analog")
+            .arg(self.url_arg)
+            .arg(self.method_arg)
+            .get_matches();
 
-    let option = matches.get_one::<String>("method")
-        .unwrap()
-        .parse::<Method>()?;
-    let url = matches.get_one::<String>("url");
+        let option = matches
+            .get_one::<String>("method")
+            .unwrap()
+            .parse::<Method>()?;
+        let url = matches.get_one::<String>("url").unwrap();
 
-    println!("url: {:?}, option: {:?}", url, option);
-    Ok(())
+        let request = build_request(&self.client, url, option, HeaderMap::new(), Body::from(""));
+
+        let handles = send_requests(vec![request]);
+        for handle in handles {
+            let text = handle.await??.text().await?;
+            println!("body: {:?}", text);
+        }
+        Ok(())
+    }
 }
