@@ -11,6 +11,7 @@ pub struct Cli {
     query_arg: Arg,
     method_arg: Arg,
     headers_arg: Arg,
+    gui_arg: Arg,
 }
 
 impl Default for Cli {
@@ -23,7 +24,9 @@ impl Cli {
     pub fn new() -> Cli {
         Cli {
             client: Client::new(),
-            url_arg: Arg::new("url").help("Request URL").required(true),
+            url_arg: Arg::new("url")
+                .help("Request URL")
+                .required_unless_present("gui"),
             query_arg: Arg::new("query")
                 .short('Q')
                 .long("query")
@@ -42,6 +45,12 @@ impl Cli {
                 .value_name("HEADERS")
                 .action(ArgAction::Append)
                 .help("List of headers in format 'Key: Value'"),
+            gui_arg: Arg::new("gui")
+                .short('g')
+                .long("gui")
+                .action(ArgAction::SetTrue)
+                .global(true)
+                .help("Run GUI"),
         }
     }
 
@@ -49,12 +58,18 @@ impl Cli {
         let matches = Command::new("crabapi")
             .version("0.1.0")
             .author("Microsoft")
-            .about("Postman analog")
+            .about("CrabAPI - Web API Test tool")
             .arg(self.url_arg)
             .arg(self.query_arg)
             .arg(self.method_arg)
             .arg(self.headers_arg)
+            .arg(self.gui_arg)
             .get_matches();
+
+        if matches.contains_id("gui") {
+            crate::gui::run_gui();
+            return Ok(());
+        }
 
         let mut query = HashMap::new();
         if let Some(query_values) = matches.get_many::<String>("query") {
