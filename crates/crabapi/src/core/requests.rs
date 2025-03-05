@@ -4,7 +4,7 @@ use tokio::task::JoinHandle;
 
 pub fn build_request(
     client: &Client,
-    url: &String,
+    url: &str,
     method: Method,
     headers: HeaderMap,
     body: Body,
@@ -28,21 +28,21 @@ pub async fn print_response(handle: JoinHandle<Result<Response, Error>>) -> Resu
     let response = handle.await.unwrap()?;
     let headers = response.headers().clone();
     let url = response.url().clone();
-    let status = response.status().clone();
-    let version = response.version().clone();
+    let status = response.status();
+    let version = response.version();
     let body = response.text().await?;
-    
-    print!("{url} - {status} - {version:#?} - \n");
+
+    println!("{url} - {status} - {version:#?} - ");
     for header in headers.iter() {
         println!("\t{:#?}: {:#?}", header.0, header.1);
     }
     println!();
     if body.len() > 80 {
-        println!("Body:\n{}\n...[truncated]", body[0..79].to_string());
+        println!("Body:\n{}\n...[truncated]", &body[0..79]);
     } else {
         println!("Body:\n{}", body);
     }
-    
+
     Ok(())
 }
 

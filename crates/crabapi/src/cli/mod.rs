@@ -3,7 +3,6 @@ use clap::{Arg, ArgAction, Command};
 use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use reqwest::{Body, Client};
 use std::error::Error;
-use std::ptr::read;
 
 pub struct Cli {
     client: Client,
