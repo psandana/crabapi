@@ -2,11 +2,13 @@ use crate::core::requests::{build_request, print_response, send_requests};
 use clap::{Arg, ArgAction, Command};
 use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use reqwest::{Body, Client};
+use std::collections::HashMap;
 use std::error::Error;
 
 pub struct Cli {
     client: Client,
     url_arg: Arg,
+    query_arg: Arg,
     method_arg: Arg,
     headers_arg: Arg,
 }
@@ -16,11 +18,17 @@ impl Cli {
         Cli {
             client: Client::new(),
             url_arg: Arg::new("url").help("Request URL").required(true),
+            query_arg: Arg::new("query")
+                .short('Q')
+                .long("query")
+                .value_name("QUERY")
+                .action(ArgAction::Append)
+                .help("Request query"),
             method_arg: Arg::new("method")
                 .short('X')
                 .long("method")
                 .value_name("METHOD")
-                .help("HTTP method(GET, POST)")
+                .help("HTTP method(GET, POST, PUT, DELETE, OPTIONS)")
                 .default_value("GET"),
             headers_arg: Arg::new("headers")
                 .short('H')
@@ -37,11 +45,21 @@ impl Cli {
             .author("Microsoft")
             .about("Postman analog")
             .arg(self.url_arg)
+            .arg(self.query_arg)
             .arg(self.method_arg)
             .arg(self.headers_arg)
             .get_matches();
 
-        let option = matches
+        let mut query = HashMap::new();
+        if let Some(query_values) = matches.get_many::<String>("query") {
+            for query_value in query_values {
+                if let Some((key, value)) = query_value.split_once(": ") {
+                    query.insert(key.to_string(), value.to_string());
+                }
+            }
+        }
+
+        let method = matches
             .get_one::<String>("method")
             .unwrap()
             .parse::<Method>()?;
@@ -59,7 +77,7 @@ impl Cli {
             }
         }
 
-        let request = build_request(&self.client, url, option, headers, Body::from(""));
+        let request = build_request(&self.client, url, query, method, headers, Body::from(""));
 
         println!("Send request: {:?}\n", request);
 

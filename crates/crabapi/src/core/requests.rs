@@ -1,16 +1,24 @@
 use http::{HeaderMap, Method};
 use reqwest::{Body, Client, Error, RequestBuilder, Response};
+use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
+// TODO: Implement params too
 pub fn build_request(
     client: &Client,
     url: &str,
+    query: HashMap<String, String>,
     method: Method,
     headers: HeaderMap,
     body: Body,
 ) -> RequestBuilder {
+    let mut default_headers = HeaderMap::new();
+    default_headers.insert("User-Agent", "CrabAPI v0.0.1".parse().unwrap()); // TODO: To constant
+
     let request = reqwest::Request::new(method, url.parse().unwrap());
     RequestBuilder::from_parts(client.clone(), request)
+        .query(&query)
+        .headers(default_headers)
         .headers(headers.clone())
         .body(body)
 }
