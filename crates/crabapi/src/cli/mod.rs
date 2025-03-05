@@ -1,6 +1,6 @@
 use crate::core::requests::{build_request, send_requests};
-use clap::{Arg, Command};
-use http::{HeaderMap, Method};
+use clap::{Arg, ArgAction, Command};
+use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use reqwest::{Body, Client};
 use std::error::Error;
 
@@ -8,6 +8,7 @@ pub struct Cli {
     client: Client,
     url_arg: Arg,
     method_arg: Arg,
+    headers_arg: Arg,
 }
 
 impl Cli {
@@ -21,6 +22,12 @@ impl Cli {
                 .value_name("METHOD")
                 .help("HTTP method(GET, POST)")
                 .default_value("GET"),
+            headers_arg: Arg::new("headers")
+                .short('H')
+                .long("header")
+                .value_name("HEADERS")
+                .action(ArgAction::Append)
+                .help("List of headers in format 'Key: Value'" )
         }
     }
 
@@ -31,6 +38,7 @@ impl Cli {
             .about("Postman analog")
             .arg(self.url_arg)
             .arg(self.method_arg)
+            .arg(self.headers_arg)
             .get_matches();
 
         let option = matches
@@ -39,12 +47,26 @@ impl Cli {
             .parse::<Method>()?;
         let url = matches.get_one::<String>("url").unwrap();
 
-        let request = build_request(&self.client, url, option, HeaderMap::new(), Body::from(""));
+        let mut headers = HeaderMap::new();
+        if let Some(header_values) = matches.get_many::<String>("headers") {
+            for header_value in header_values {
+                if let Some((key, value)) = header_value.split_once(": ") {
+                    headers.insert(
+                        HeaderName::from_bytes(key.trim().as_bytes())?,
+                        HeaderValue::from_str(value.trim())?
+                    );
+                }
+            }
+        }
+
+        let request = build_request(&self.client, url, option, headers, Body::from(""));
+
+        println!("Send request: {:?}\n", request);
 
         let handles = send_requests(vec![request]);
         for handle in handles {
             let text = handle.await??.text().await?;
-            println!("body: {:?}", text);
+            println!("Response body: {:?}\n", text);
         }
         Ok(())
     }
