@@ -27,7 +27,7 @@ impl Cli {
                 .long("header")
                 .value_name("HEADERS")
                 .action(ArgAction::Append)
-                .help("List of headers in format 'Key: Value'" )
+                .help("List of headers in format 'Key: Value'"),
         }
     }
 
@@ -53,7 +53,7 @@ impl Cli {
                 if let Some((key, value)) = header_value.split_once(": ") {
                     headers.insert(
                         HeaderName::from_bytes(key.trim().as_bytes())?,
-                        HeaderValue::from_str(value.trim())?
+                        HeaderValue::from_str(value.trim())?,
                     );
                 }
             }
