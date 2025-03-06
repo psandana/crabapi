@@ -1,6 +1,6 @@
 use iced;
-use iced::widget::button;
-use iced::widget::{Button, Column, PickList, Text, TextInput, column, row, text};
+use iced::widget::{Button, Column, Text, TextInput, column, row, text};
+use iced::widget::{button, combo_box, container};
 use iced::{Element, Length};
 
 use http::Method;
@@ -25,7 +25,8 @@ enum Message {
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct GUI {
-    method_selected: Method,
+    methods: combo_box::State<Method>,
+    method_selected: Option<Method>,
     url_input: String, //http::Uri,
     header_input: Vec<(String, String)>, //http::HeaderMap,
                        // body_input: String,   //http::Body
@@ -34,7 +35,14 @@ pub struct GUI {
 impl GUI {
     fn new() -> Self {
         Self {
-            method_selected: Method::GET,
+            methods: combo_box::State::new(vec![
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::PATCH,
+            ]),
+            method_selected: None,
             url_input: String::new(),
             header_input: vec![(String::new(), String::new())],
             // body_input: String::new(),
@@ -48,7 +56,7 @@ impl GUI {
     fn update(&mut self, event: Message) {
         match event {
             Message::MethodChanged(method) => {
-                self.method_selected = method;
+                self.method_selected = Some(method);
             }
             Message::UrlInputChanged(url) => {
                 self.url_input = url; //http::Uri::from_static("http://localhost:7878");
@@ -83,13 +91,15 @@ impl GUI {
         let url_input = TextInput::new("Enter URI", &self.url_input)
             .on_input(Message::UrlInputChanged)
             .width(Length::Fill);
-        let method_pick_list = PickList::new(
-            vec![Method::GET, Method::POST, Method::PUT, Method::DELETE],
-            Some(&self.method_selected),
+        let method_combo_box = combo_box(
+            &self.methods,
+            "Method",
+            self.method_selected.as_ref(),
             Message::MethodChanged,
-        );
+        )
+        .width(75);
         let send_button = Button::new(Text::new("Send").size(20)).on_press(Message::SendRequest);
-        let request_row = row![method_pick_list, url_input, send_button]
+        let request_row = row![method_combo_box, url_input, send_button]
             .spacing(10)
             .padding(10)
             .align_y(iced::Alignment::Center);
@@ -119,7 +129,11 @@ impl GUI {
             Button::new(Text::new("Add Header").size(20)).on_press(Message::AddHeader);
         headers_column = headers_column.push(add_header_button);
 
-        column![request_row, headers_column].into()
+        column![
+            request_row,
+            container(headers_column).width(Length::Fill).padding(10)
+        ]
+        .into()
     }
 
     fn label(label: &str) -> Column<'_, Message> {
