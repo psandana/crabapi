@@ -2,7 +2,7 @@ use iced;
 use iced::Element;
 use iced::widget::{Column, column, combo_box, text, text_input};
 
-use http::Method;
+use crate::core::requests::{Method, Url, constants};
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -29,13 +29,7 @@ pub struct GUI {
 impl GUI {
     fn new() -> Self {
         Self {
-            methods: combo_box::State::new(vec![
-                Method::GET,
-                Method::POST,
-                Method::PUT,
-                Method::DELETE,
-                Method::PATCH,
-            ]),
+            methods: combo_box::State::new(constants::METHODS.into()),
             method_selected: None,
             url_input: String::new(),
             // header_input: String::new(),
