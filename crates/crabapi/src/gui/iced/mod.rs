@@ -1,8 +1,6 @@
 use iced;
 use iced::widget::button;
-use iced::widget::{
-    Button, Column, PickList, Text, TextInput, column, row, text,
-};
+use iced::widget::{Button, Column, PickList, Text, TextInput, column, row, text};
 use iced::{Element, Length};
 
 use http::Method;
