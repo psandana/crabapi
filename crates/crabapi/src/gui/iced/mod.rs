@@ -44,7 +44,7 @@ impl GUI {
     }
 
     fn title(&self) -> String {
-        "CrabAPI".to_string()
+        crate::core::app::constants::APP_NAME.to_string()
     }
 
     fn update(&mut self, event: Message) {

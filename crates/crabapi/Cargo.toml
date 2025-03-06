@@ -9,9 +9,11 @@ iced = ["dep:iced"]
 
 [dependencies]
 clap = "4.5.31"
+const_format = "0.2.34"
 http = "1.2.0"
 reqwest = "0.12.12"
 tokio = { version = "1", features = ["full"] }
 
 # gui options are optional
 iced = { version = "0.13.1", optional = true }
+

@@ -3,6 +3,16 @@ use reqwest::{Body, Client, Error, RequestBuilder, Response};
 use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
+pub mod constants {
+    use const_format::formatcp;
+
+    pub const USER_AGENT: &str = formatcp!(
+        "{} v{}",
+        crate::core::app::constants::APP_NAME,
+        crate::core::app::constants::APP_VERSION
+    );
+}
+
 // TODO: Implement params too
 pub fn build_request(
     client: &Client,
@@ -13,7 +23,7 @@ pub fn build_request(
     body: Body,
 ) -> RequestBuilder {
     let mut default_headers = HeaderMap::new();
-    default_headers.insert("User-Agent", "CrabAPI v0.0.1".parse().unwrap()); // TODO: To constant
+    default_headers.insert("User-Agent", constants::USER_AGENT.parse().unwrap());
 
     let request = reqwest::Request::new(method, url.parse().unwrap());
     RequestBuilder::from_parts(client.clone(), request)
@@ -53,48 +63,3 @@ pub async fn print_response(handle: JoinHandle<Result<Response, Error>>) -> Resu
 
     Ok(())
 }
-
-// --------------
-// -- EXAMPLE: --
-// --------------
-// #[tokio::main]
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     let client = Client::new();
-//
-//     // send 1 request
-//     let req = build_request(
-//         &client,
-//         "http://localhost:7878".to_string(),
-//         Method::GET,
-//         HeaderMap::new(),
-//         Body::from("Get Request"),
-//     );
-//     let handles = send_requests(vec![req]);
-//
-//     for handle in handles {
-//         let body = handle.await??.text().await?;
-//         println!("body: {}", body.len());
-//     }
-//
-//     // send 10 requests
-//     let mut reqs = vec![];
-//     for i in 0..10 {
-//         let mut headers = HeaderMap::new();
-//         headers.insert("key", i.to_string().parse().unwrap());
-//         reqs.push(build_request(
-//             &client,
-//             "http://localhost:7878".to_string(),
-//             Method::POST,
-//             headers,
-//             Body::from("POST Request"),
-//         ));
-//     }
-//
-//     let handles = send_requests(reqs);
-//     for handle in handles {
-//         let body = handle.await??.text().await?;
-//         println!("body: {}", body.len());
-//     }
-//
-//     Ok(())
-// }
