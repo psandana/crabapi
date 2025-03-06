@@ -1,5 +1,7 @@
+use crate::core::app::constants;
 use crate::core::requests::{build_request, print_response, send_requests};
 use clap::{Arg, ArgAction, Command};
+use const_format::formatcp;
 use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use reqwest::{Body, Client};
 use std::collections::HashMap;
@@ -61,10 +63,14 @@ impl Cli {
     }
 
     pub async fn run(self) -> Result<(), Box<dyn Error>> {
-        let matches = Command::new("crabapi")
-            .version("0.1.0")
-            .author("Microsoft")
-            .about("CrabAPI - Web API Test tool")
+        let matches = Command::new(constants::APP_COMMAND_NAME)
+            .version(constants::APP_VERSION)
+            .author(constants::APP_AUTHOR)
+            .about(formatcp!(
+                "{} - {}",
+                constants::APP_NAME,
+                constants::APP_DESCRIPTION
+            ))
             .arg(self.url_arg)
             .arg(self.query_arg)
             .arg(self.method_arg)
