@@ -4,7 +4,7 @@ mod default_styles;
 // dependencies
 use iced;
 use iced::widget::{Button, Row, Text, TextInput};
-use iced::widget::{button, column, combo_box, container, row};
+use iced::widget::{button, column, container, pick_list, row};
 use iced::{Alignment, Element, Length};
 
 // internal dependencies
@@ -29,7 +29,7 @@ enum Message {
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 struct GUI {
-    methods: combo_box::State<Method>,
+    methods: &'static [Method],
     method_selected: Option<Method>,
     url_input: String,
     url_input_valid: bool,
@@ -39,7 +39,7 @@ struct GUI {
 impl GUI {
     fn new() -> Self {
         Self {
-            methods: combo_box::State::new(constants::METHODS.into()),
+            methods: &constants::METHODS,
             method_selected: Some(Method::GET),
             url_input: String::new(),
             url_input_valid: false,
@@ -99,12 +99,12 @@ impl GUI {
     fn view_request(&self) -> Element<Message> {
         let url_input = self.view_request_url_input();
 
-        let method_combo_box = self.view_request_method_input();
+        let method_input = self.view_request_method_input();
 
         let send_button = Self::view_request_send_button();
 
         let request_row =
-            Self::view_request_row_setup(row![method_combo_box, url_input, send_button]);
+            Self::view_request_row_setup(row![method_input, url_input, send_button]);
 
         request_row.into()
     }
@@ -133,14 +133,13 @@ impl GUI {
     }
 
     fn view_request_method_input(&self) -> Element<Message> {
-        combo_box(
-            &self.methods,
-            "Method",
-            self.method_selected.as_ref(),
+        pick_list(
+            self.methods,
+            self.method_selected.clone(),
             Message::MethodChanged,
-        )
-        .width(75)
-        .size(default_styles::input_size_as_f32())
+        ).placeholder("Method")
+        .width(Length::Shrink)
+        .text_size(default_styles::input_size())
         .into()
     }
 
