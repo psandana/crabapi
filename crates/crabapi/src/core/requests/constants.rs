@@ -1,4 +1,3 @@
-
 use const_format::formatcp;
 use http::Method;
 
