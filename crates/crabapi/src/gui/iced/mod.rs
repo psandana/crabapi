@@ -1,11 +1,11 @@
 use iced;
 use iced::widget::button;
 use iced::widget::{
-    Button, Column, PickList, Row, Text, TextInput, column, combo_box, row, text, text_input,
+    Button, Column, PickList, Text, TextInput, column, row, text,
 };
-use iced::{Element, Length, Theme, theme};
+use iced::{Element, Length};
 
-use http::{HeaderMap, HeaderName, HeaderValue, Method, header};
+use http::Method;
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
