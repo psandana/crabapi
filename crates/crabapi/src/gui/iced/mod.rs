@@ -1,9 +1,14 @@
-use iced;
-use iced::widget::{Button, Text, TextInput, column, row};
-use iced::widget::{button, combo_box, container};
-use iced::{Element, Length};
+// internal mods
+mod default_styles;
 
-use crate::core::requests::{Method, constants};
+// dependencies
+use iced;
+use iced::widget::{Button, Row, Text, TextInput};
+use iced::widget::{button, column, combo_box, container, row};
+use iced::{Alignment, Element, Length};
+
+// internal dependencies
+use crate::core::requests::{Method, constants, validators};
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -13,8 +18,6 @@ pub fn init() {
 enum Message {
     MethodChanged(Method),
     UrlInputChanged(String),
-    // HeaderInputChanged(String),
-    // BodyInputChanged(String),
     SendRequest,
     HeaderKeyChanged(usize, String),
     HeaderValueChanged(usize, String),
@@ -25,7 +28,7 @@ enum Message {
 
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
-pub struct GUI {
+struct GUI {
     methods: combo_box::State<Method>,
     method_selected: Option<Method>,
     url_input: String,
@@ -41,7 +44,6 @@ impl GUI {
             url_input: String::new(),
             url_input_valid: false,
             header_input: vec![(String::new(), String::new())],
-            // body_input: String::new(),
         }
     }
 
@@ -57,12 +59,7 @@ impl GUI {
             Message::UrlInputChanged(url) => {
                 self.url_input = url;
                 self.url_input_valid = validators::is_valid_url(&self.url_input);
-            } // Message::HeaderInputChanged(header) => {
-            //     self.header_input = header; // ttp::HeaderMap::new();
-            // }
-            // Message::BodyInputChanged(body) => {
-            //     self.body_input = body; // http::Body::from("Body");
-            // }
+            }
             Message::SendRequest => {
                 // TODO
             }
@@ -79,7 +76,7 @@ impl GUI {
             Message::AddHeader => {
                 self.header_input.push((String::new(), String::new()));
             }
-            _ => {}
+            _ => {} // TODO: REmove this. Unnecessary if all implemented and enum is non-exhaustive
         }
     }
 
@@ -92,92 +89,131 @@ impl GUI {
 
         column![
             request_row,
-            container(headers_column).width(Length::Fill).padding(10)
+            container(headers_column)
+                .width(Length::Fill)
+                .padding(default_styles::padding())
         ]
         .into()
     }
 
     fn view_request(&self) -> Element<Message> {
-        let url_input_icon = iced::widget::text_input::Icon {
-            font: iced::Font::default(),
-            code_point: if self.url_input_valid { '✅' } else { '❌' },
-            size: Some(default_styles::input_size()),
-            spacing: 0.0,
-            side: iced::widget::text_input::Side::Right,
-        };
+        let url_input = self.view_request_url_input();
 
+        let method_combo_box = self.view_request_method_input();
+
+        let send_button = Self::view_request_send_button();
+
+        let request_row =
+            Self::view_request_row_setup(row![method_combo_box, url_input, send_button]);
+
+        request_row.into()
+    }
+
+    // VIEW REQUEST - GENERAL
+
+    fn view_request_url_input(&self) -> Element<Message> {
+        let url_input_icon = Self::view_request_url_input_icon(self.url_input_valid);
         let url_input = TextInput::new("Enter URI", &self.url_input)
             .on_input(Message::UrlInputChanged)
             .size(default_styles::input_size())
             .icon(url_input_icon)
             .width(Length::Fill);
-        let method_combo_box = combo_box(
+
+        url_input.into()
+    }
+
+    fn view_request_url_input_icon(valid: bool) -> iced::widget::text_input::Icon<iced::Font> {
+        iced::widget::text_input::Icon {
+            font: iced::Font::default(),
+            code_point: if valid { '✅' } else { '❌' },
+            size: Some(default_styles::input_size()),
+            spacing: 0.0,
+            side: iced::widget::text_input::Side::Right,
+        }
+    }
+
+    fn view_request_method_input(&self) -> Element<Message> {
+        combo_box(
             &self.methods,
             "Method",
             self.method_selected.as_ref(),
             Message::MethodChanged,
         )
         .width(75)
-        .size(default_styles::input_size_as_f32());
-
-        let send_button = Button::new(Text::new("Send").size(20)).on_press(Message::SendRequest);
-        let request_row = row![method_combo_box, url_input, send_button]
-            .spacing(10)
-            .padding(10)
-            .align_y(iced::Alignment::Center);
-
-        request_row.into()
+        .size(default_styles::input_size_as_f32())
+        .into()
     }
 
+    fn view_request_row_setup(request_row: Row<'_, Message>) -> Row<'_, Message> {
+        request_row
+            .spacing(default_styles::spacing())
+            .padding(default_styles::padding())
+            .align_y(Alignment::Center)
+    }
+
+    fn view_request_send_button() -> Element<'static, Message> {
+        Button::new(Text::new("Send").size(default_styles::input_size()))
+            .on_press(Message::SendRequest)
+            .into()
+    }
+
+    // VIEW REQUEST - HEADERS
+
     fn view_request_headers(&self) -> Element<Message> {
-        let headers_title = Text::new("Headers").size(16);
-        let mut headers_column = column![headers_title].spacing(10);
+        let headers_title = Self::view_request_headers_title();
+
+        let headers_column = self.view_request_headers_column();
+
+        let header_add_button = Self::view_request_headers_add_button();
+
+        column![headers_title, headers_column, header_add_button]
+            .spacing(default_styles::spacing())
+            .into()
+    }
+
+    fn view_request_headers_title() -> Element<'static, Message> {
+        Text::new("Headers").size(16).into()
+    }
+
+    fn view_request_headers_column(&self) -> Element<Message> {
+        let mut headers_column = column![];
 
         for (i, header) in self.header_input.iter().enumerate() {
-            let header_row = row![
-                TextInput::new("Key", &header.0)
-                    .on_input(move |key| Message::HeaderKeyChanged(i, key))
-                    .width(Length::FillPortion(1)),
-                TextInput::new("Value", &header.1) // TODO: Change unwrap
-                    .on_input(move |value| Message::HeaderValueChanged(i, value))
-                    .width(Length::FillPortion(2)),
-                Button::new(Text::new("X"))
-                    .on_press(Message::RemoveHeader(i))
-                    .style(button::danger)
-            ]
-            .spacing(10);
-
+            let header_row = self.view_request_headers_column_row(i, header);
             headers_column = headers_column.push(header_row);
         }
+        headers_column.spacing(default_styles::spacing()).into()
+    }
 
-        let add_header_button =
-            Button::new(Text::new("Add Header").size(20)).on_press(Message::AddHeader);
-        headers_column = headers_column.push(add_header_button);
+    fn view_request_headers_column_row(
+        &self,
+        index: usize,
+        header: &(String, String),
+    ) -> Element<Message> {
+        row![
+            TextInput::new("Key", &header.0)
+                .on_input(move |key| Message::HeaderKeyChanged(index, key))
+                .width(Length::FillPortion(1)),
+            TextInput::new("Value", &header.1) // TODO: Change unwrap
+                .on_input(move |value| Message::HeaderValueChanged(index, value))
+                .width(Length::FillPortion(2)),
+            Button::new(Text::new("X"))
+                .on_press(Message::RemoveHeader(index))
+                .style(button::danger)
+        ]
+        .spacing(default_styles::spacing())
+        .into()
+    }
 
-        headers_column.into()
+    fn view_request_headers_add_button() -> Element<'static, Message> {
+        Button::new(Text::new("Add Header").size(default_styles::input_size()))
+            .on_press(Message::AddHeader)
+            .into()
     }
 }
 
 impl Default for GUI {
     fn default() -> Self {
         GUI::new()
-    }
-}
-
-mod validators {
-    use crate::core::requests::Url;
-
-    pub fn is_valid_url(url: &str) -> bool {
-        Url::parse(url).is_ok()
-    }
-}
-
-mod default_styles {
-    pub const fn input_size_as_f32() -> f32 {
-        20.0
-    }
-
-    pub const fn input_size() -> iced::Pixels {
-        iced::Pixels(input_size_as_f32())
     }
 }
