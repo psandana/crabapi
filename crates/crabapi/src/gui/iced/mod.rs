@@ -1,9 +1,9 @@
 use iced;
-use iced::widget::{Button, Column, Text, TextInput, column, row, text};
+use iced::widget::{Button, Text, TextInput, column, row};
 use iced::widget::{button, combo_box, container};
 use iced::{Element, Length};
 
-use http::Method;
+use crate::core::requests::{Method, Url, constants};
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -18,6 +18,7 @@ enum Message {
     SendRequest,
     HeaderKeyChanged(usize, String),
     HeaderValueChanged(usize, String),
+    #[allow(dead_code)] // TODO: Remove this out-out warning
     RemoveHeader(usize),
     AddHeader,
 }
@@ -27,23 +28,18 @@ enum Message {
 pub struct GUI {
     methods: combo_box::State<Method>,
     method_selected: Option<Method>,
-    url_input: String, //http::Uri,
-    header_input: Vec<(String, String)>, //http::HeaderMap,
-                       // body_input: String,   //http::Body
+    url_input: String,
+    url_input_valid: bool,
+    header_input: Vec<(String, String)>,
 }
 
 impl GUI {
     fn new() -> Self {
         Self {
-            methods: combo_box::State::new(vec![
-                Method::GET,
-                Method::POST,
-                Method::PUT,
-                Method::DELETE,
-                Method::PATCH,
-            ]),
+            methods: combo_box::State::new(constants::METHODS.into()),
             method_selected: None,
             url_input: String::new(),
+            url_input_valid: false,
             header_input: vec![(String::new(), String::new())],
             // body_input: String::new(),
         }
@@ -59,7 +55,8 @@ impl GUI {
                 self.method_selected = Some(method);
             }
             Message::UrlInputChanged(url) => {
-                self.url_input = url; //http::Uri::from_static("http://localhost:7878");
+                self.url_input = url;
+                self.url_input_valid = GUI::is_valid_url(&self.url_input);
             } // Message::HeaderInputChanged(header) => {
             //     self.header_input = header; // ttp::HeaderMap::new();
             // }
@@ -88,8 +85,18 @@ impl GUI {
 
     fn view(&self) -> Element<Message> {
         // ROW: Method, URI, Send Button
+        let url_input_icon = iced::widget::text_input::Icon {
+            font: iced::Font::default(),
+            code_point: if self.url_input_valid { '✅' } else { '❌' },
+            size: Some(Self::input_size()),
+            spacing: 0.0,
+            side: iced::widget::text_input::Side::Right,
+        };
+
         let url_input = TextInput::new("Enter URI", &self.url_input)
             .on_input(Message::UrlInputChanged)
+            .size(Self::input_size())
+            .icon(url_input_icon)
             .width(Length::Fill);
         let method_combo_box = combo_box(
             &self.methods,
@@ -97,7 +104,9 @@ impl GUI {
             self.method_selected.as_ref(),
             Message::MethodChanged,
         )
-        .width(75);
+        .width(75)
+        .size(Self::input_size_as_f32());
+
         let send_button = Button::new(Text::new("Send").size(20)).on_press(Message::SendRequest);
         let request_row = row![method_combo_box, url_input, send_button]
             .spacing(10)
@@ -136,8 +145,16 @@ impl GUI {
         .into()
     }
 
-    fn label(label: &str) -> Column<'_, Message> {
-        column![text(label)].spacing(10)
+    fn is_valid_url(url: &str) -> bool {
+        Url::parse(url).is_ok()
+    }
+
+    const fn input_size_as_f32() -> f32 {
+        20.0
+    }
+
+    const fn input_size() -> iced::Pixels {
+        iced::Pixels(Self::input_size_as_f32())
     }
 }
 

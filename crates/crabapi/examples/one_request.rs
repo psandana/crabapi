@@ -1,4 +1,4 @@
-use crabapi::core::requests::{build_request, send_requests};
+use crabapi::core::requests::{Url, build_request, send_requests};
 use http::{HeaderMap, Method};
 use reqwest::{Body, Client};
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // send 1 request
     let req = build_request(
         &client,
-        "http://localhost:7878",
+        Url::parse("http://localhost:7878").unwrap(),
         HashMap::new(),
         Method::GET,
         HeaderMap::new(),

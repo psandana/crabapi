@@ -1,22 +1,44 @@
-use http::{HeaderMap, Method};
 use reqwest::{Body, Client, Error, RequestBuilder, Response};
 use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
+pub use http::{HeaderMap, Method};
+pub use reqwest::Url;
+
 pub mod constants {
     use const_format::formatcp;
+    use http::Method;
 
     pub const USER_AGENT: &str = formatcp!(
         "{} v{}",
         crate::core::app::constants::APP_NAME,
         crate::core::app::constants::APP_VERSION
     );
+
+    pub const METHODS: [Method; 9] = [
+        Method::GET,
+        Method::POST,
+        Method::PUT,
+        Method::DELETE,
+        Method::HEAD,
+        Method::OPTIONS,
+        Method::CONNECT,
+        Method::PATCH,
+        Method::TRACE,
+    ];
+
+    pub const METHODS_STRING: [&str; 9] = [
+        "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "CONNECT", "PATCH", "TRACE",
+    ];
+
+    pub const ALL_METHODS_AS_STRING: &str =
+        "GET, POST, PUT, DELETE, HEAD, OPTIONS, CONNECT, PATCH, TRACE";
 }
 
 // TODO: Implement params too
 pub fn build_request(
     client: &Client,
-    url: &str,
+    url: Url,
     query: HashMap<String, String>,
     method: Method,
     headers: HeaderMap,
@@ -25,7 +47,7 @@ pub fn build_request(
     let mut default_headers = HeaderMap::new();
     default_headers.insert("User-Agent", constants::USER_AGENT.parse().unwrap());
 
-    let request = reqwest::Request::new(method, url.parse().unwrap());
+    let request = reqwest::Request::new(method, url);
     RequestBuilder::from_parts(client.clone(), request)
         .query(&query)
         .headers(default_headers)
