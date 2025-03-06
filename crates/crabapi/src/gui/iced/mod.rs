@@ -4,7 +4,7 @@ mod default_styles;
 // dependencies
 use iced;
 use iced::widget::{Button, Row, Text, TextInput};
-use iced::widget::{button, column, container, pick_list, row};
+use iced::widget::{button, column, container, pick_list, radio, row};
 use iced::{Alignment, Element, Length};
 
 // internal dependencies
@@ -24,6 +24,13 @@ enum Message {
     #[allow(dead_code)] // TODO: Remove this out-out warning
     RemoveHeader(usize),
     AddHeader,
+    BodyTypeChanged(BodyType),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyType {
+    File,
+    Text,
 }
 
 #[derive(Debug)]
@@ -34,6 +41,8 @@ struct GUI {
     url_input: String,
     url_input_valid: bool,
     header_input: Vec<(String, String)>,
+    // body_input: String,
+    body_type_select: Option<BodyType>,
 }
 
 impl GUI {
@@ -44,6 +53,7 @@ impl GUI {
             url_input: String::new(),
             url_input_valid: false,
             header_input: vec![(String::new(), String::new())],
+            body_type_select: Some(BodyType::Text),
         }
     }
 
@@ -76,6 +86,10 @@ impl GUI {
             Message::AddHeader => {
                 self.header_input.push((String::new(), String::new()));
             }
+            Message::BodyTypeChanged(body_type) => {
+                println!("Body Type Changed: {:?}", body_type);
+                self.body_type_select = Some(body_type);
+            }
             _ => {} // TODO: REmove this. Unnecessary if all implemented and enum is non-exhaustive
         }
     }
@@ -85,15 +99,12 @@ impl GUI {
         let request_row = self.view_request();
 
         // ROW: Headers
-        let headers_column = self.view_request_headers();
+        let headers_row = self.view_request_headers();
 
-        column![
-            request_row,
-            container(headers_column)
-                .width(Length::Fill)
-                .padding(default_styles::padding())
-        ]
-        .into()
+        // ROW: Body
+        let body_row = self.view_request_body();
+
+        column![request_row, headers_row, body_row].into()
     }
 
     fn view_request(&self) -> Element<Message> {
@@ -105,10 +116,18 @@ impl GUI {
 
         let request_row = Self::view_request_row_setup(row![method_input, url_input, send_button]);
 
-        request_row.into()
+        let title_row = Self::view_request_row_setup(row![Self::view_request_title()]);
+
+        column![title_row, request_row].into()
     }
 
     // VIEW REQUEST - GENERAL
+
+    fn view_request_title() -> Element<'static, Message> {
+        Text::new("Request")
+            .size(default_styles::input_size())
+            .into()
+    }
 
     fn view_request_url_input(&self) -> Element<Message> {
         let url_input_icon = Self::view_request_url_input_icon(self.url_input_valid);
@@ -159,6 +178,13 @@ impl GUI {
     // VIEW REQUEST - HEADERS
 
     fn view_request_headers(&self) -> Element<Message> {
+        container(self.view_request_headers_inner())
+            .width(Length::Fill)
+            .padding(default_styles::padding())
+            .into()
+    }
+
+    fn view_request_headers_inner(&self) -> Element<Message> {
         let headers_title = Self::view_request_headers_title();
 
         let headers_column = self.view_request_headers_column();
@@ -171,7 +197,9 @@ impl GUI {
     }
 
     fn view_request_headers_title() -> Element<'static, Message> {
-        Text::new("Headers").size(16).into()
+        Text::new("Headers")
+            .size(default_styles::input_size())
+            .into()
     }
 
     fn view_request_headers_column(&self) -> Element<Message> {
@@ -207,6 +235,33 @@ impl GUI {
     fn view_request_headers_add_button() -> Element<'static, Message> {
         Button::new(Text::new("Add Header").size(default_styles::input_size()))
             .on_press(Message::AddHeader)
+            .into()
+    }
+
+    // VIEW REQUEST - BODY
+
+    fn view_request_body(&self) -> Element<Message> {
+        let body_title = Self::view_request_body_title();
+
+        let text = radio(
+            "Text",
+            BodyType::Text,
+            self.body_type_select,
+            Message::BodyTypeChanged,
+        );
+        let file = radio(
+            "File",
+            BodyType::File,
+            self.body_type_select,
+            Message::BodyTypeChanged,
+        );
+
+        column!(body_title, row![text, file].spacing(default_styles::spacing())).into()
+    }
+
+    fn view_request_body_title() -> Element<'static, Message> {
+        Text::new("Body")
+            .size(default_styles::input_size())
             .into()
     }
 }
