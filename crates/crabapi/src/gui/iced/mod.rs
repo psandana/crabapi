@@ -21,9 +21,10 @@ enum Message {
 pub struct GUI {
     methods: combo_box::State<Method>,
     method_selected: Option<Method>,
-    url_input: String, //http::Uri,
-                       // header_input: String, //http::HeaderMap,
-                       // body_input: String,   //http::Body
+    url_input: String,
+    url_input_valid: bool, //http::Uri,
+                           // header_input: String, //http::HeaderMap,
+                           // body_input: String,   //http::Body
 }
 
 impl GUI {
@@ -32,6 +33,7 @@ impl GUI {
             methods: combo_box::State::new(constants::METHODS.into()),
             method_selected: None,
             url_input: String::new(),
+            url_input_valid: false,
             // header_input: String::new(),
             // body_input: String::new(),
         }
@@ -47,7 +49,8 @@ impl GUI {
                 self.method_selected = Some(method);
             }
             Message::UrlInputChanged(url) => {
-                self.url_input = url; //http::Uri::from_static("http://localhost:7878");
+                self.url_input = url;
+                self.url_input_valid = GUI::is_valid_url(&self.url_input);
             } // Message::HeaderInputChanged(header) => {
               //     self.header_input = header; // ttp::HeaderMap::new();
               // }
@@ -58,9 +61,22 @@ impl GUI {
     }
 
     fn view(&self) -> Element<Message> {
+        let url_input_icon = iced::widget::text_input::Icon {
+            font: iced::Font::default(),
+            code_point: if self.url_input_valid { '✅' } else { '❌' },
+            size: Some(Self::input_size()),
+            spacing: 0.0,
+            side: iced::widget::text_input::Side::Right,
+        };
+        let url_input = text_input("Url", &self.url_input)
+            .on_input(Message::UrlInputChanged)
+            // .padding(10)
+            .size(Self::input_size())
+            .icon(url_input_icon);
+
         column![
-            GUI::label("Uri:"),
-            text_input("Uri", &self.url_input).on_input(Message::UrlInputChanged),
+            GUI::label("Url:"),
+            url_input,
             GUI::label("Method:"),
             combo_box(
                 &self.methods,
@@ -68,12 +84,25 @@ impl GUI {
                 self.method_selected.as_ref(),
                 Message::MethodChanged
             )
+            .size(Self::input_size_as_f32())
         ]
         .into()
     }
 
     fn label(label: &str) -> Column<'_, Message> {
         column![text(label)].spacing(10)
+    }
+
+    fn is_valid_url(url: &str) -> bool {
+        Url::parse(url).is_ok()
+    }
+
+    const fn input_size_as_f32() -> f32 {
+        20.0
+    }
+
+    const fn input_size() -> iced::Pixels {
+        iced::Pixels(Self::input_size_as_f32())
     }
 }
 

@@ -6,7 +6,7 @@ pub use http::{HeaderMap, Method};
 pub use reqwest::Url;
 
 pub mod constants {
-    use const_format::{concatcp, formatcp};
+    use const_format::formatcp;
     use http::Method;
 
     pub const USER_AGENT: &str = formatcp!(
