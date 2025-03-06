@@ -12,6 +12,7 @@ pub struct Cli {
     method_arg: Arg,
     headers_arg: Arg,
     gui_arg: Arg,
+    body_arg: Arg,
 }
 
 impl Default for Cli {
@@ -50,7 +51,12 @@ impl Cli {
                 .long("gui")
                 .action(ArgAction::SetTrue)
                 .global(true)
-                .help("Run GUI"),
+                .help("Flag: Run GUI"),
+            body_arg: Arg::new("body")
+                .short('d')
+                .long("data")
+                .value_name("BODY")
+                .help("Request body (For POST, PUT, PATCH request)"),
         }
     }
 
@@ -64,9 +70,10 @@ impl Cli {
             .arg(self.method_arg)
             .arg(self.headers_arg)
             .arg(self.gui_arg)
+            .arg(self.body_arg)
             .get_matches();
 
-        if matches.contains_id("gui") {
+        if matches.get_flag("gui") {
             crate::gui::run_gui();
             return Ok(());
         }
@@ -97,8 +104,17 @@ impl Cli {
                 }
             }
         }
+        let default_body = String::from("");
+        let body = matches.get_one::<String>("body").unwrap_or(&default_body);
 
-        let request = build_request(&self.client, url, query, method, headers, Body::from(""));
+        let request = build_request(
+            &self.client,
+            url,
+            query,
+            method,
+            headers,
+            Body::from(body.to_string()),
+        );
 
         println!("Send request: {:?}\n", request);
 
