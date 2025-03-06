@@ -103,8 +103,7 @@ impl GUI {
 
         let send_button = Self::view_request_send_button();
 
-        let request_row =
-            Self::view_request_row_setup(row![method_input, url_input, send_button]);
+        let request_row = Self::view_request_row_setup(row![method_input, url_input, send_button]);
 
         request_row.into()
     }
@@ -137,7 +136,8 @@ impl GUI {
             self.methods,
             self.method_selected.clone(),
             Message::MethodChanged,
-        ).placeholder("Method")
+        )
+        .placeholder("Method")
         .width(Length::Shrink)
         .text_size(default_styles::input_size())
         .into()
