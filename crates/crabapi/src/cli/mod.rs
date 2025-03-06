@@ -1,5 +1,7 @@
 use crate::core::app::constants;
-use crate::core::requests::{Url, build_request, constants as requests_constants, print_response, send_requests};
+use crate::core::requests::{
+    Url, build_request, constants as requests_constants, print_response, send_requests,
+};
 use clap::{Arg, ArgAction, Command};
 use const_format::formatcp;
 use http::{HeaderMap, HeaderName, HeaderValue, Method};
@@ -40,7 +42,10 @@ impl Cli {
                 .short('X')
                 .long("method")
                 .value_name("METHOD")
-                .help(formatcp!("HTTP method({})", requests_constants::ALL_METHODS_AS_STRING))
+                .help(formatcp!(
+                    "HTTP method({})",
+                    requests_constants::ALL_METHODS_AS_STRING
+                ))
                 .default_value("GET"),
             headers_arg: Arg::new("headers")
                 .short('H')

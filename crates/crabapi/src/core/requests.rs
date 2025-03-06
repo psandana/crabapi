@@ -31,7 +31,8 @@ pub mod constants {
         "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "CONNECT", "PATCH", "TRACE",
     ];
 
-    pub const ALL_METHODS_AS_STRING: &str = "GET, POST, PUT, DELETE, HEAD, OPTIONS, CONNECT, PATCH, TRACE";
+    pub const ALL_METHODS_AS_STRING: &str =
+        "GET, POST, PUT, DELETE, HEAD, OPTIONS, CONNECT, PATCH, TRACE";
 }
 
 // TODO: Implement params too

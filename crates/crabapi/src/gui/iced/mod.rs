@@ -22,9 +22,7 @@ pub struct GUI {
     methods: combo_box::State<Method>,
     method_selected: Option<Method>,
     url_input: String,
-    url_input_valid: bool, //http::Uri,
-                           // header_input: String, //http::HeaderMap,
-                           // body_input: String,   //http::Body
+    url_input_valid: bool,
 }
 
 impl GUI {
@@ -70,7 +68,6 @@ impl GUI {
         };
         let url_input = text_input("Url", &self.url_input)
             .on_input(Message::UrlInputChanged)
-            // .padding(10)
             .size(Self::input_size())
             .icon(url_input_icon);
 
