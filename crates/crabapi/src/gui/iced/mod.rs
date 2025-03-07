@@ -18,32 +18,36 @@ pub fn init() {
 enum Message {
     MethodChanged(Method),
     UrlInputChanged(String),
-    SendRequest,
     HeaderKeyChanged(usize, String),
     HeaderValueChanged(usize, String),
-    #[allow(dead_code)] // TODO: Remove this out-out warning
     RemoveHeader(usize),
     AddHeader,
+    SendRequest,
+    ResponseBodyChanged(String),
 }
 
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 struct GUI {
+    client: Client,
     methods: &'static [Method],
     method_selected: Option<Method>,
     url_input: String,
     url_input_valid: bool,
     header_input: Vec<(String, String)>,
+    response_body: Option<String>,
 }
 
 impl GUI {
     fn new() -> Self {
         Self {
+            client: Client::new(),
             methods: &constants::METHODS,
             method_selected: Some(Method::GET),
             url_input: String::new(),
             url_input_valid: false,
             header_input: vec![(String::new(), String::new())],
+            response_body: None
         }
     }
 
@@ -51,32 +55,77 @@ impl GUI {
         crate::core::app::constants::APP_NAME.to_string()
     }
 
-    fn update(&mut self, event: Message) {
+    fn update(&mut self, event: Message) -> Task<Message> {
         match event {
             Message::MethodChanged(method) => {
                 self.method_selected = Some(method);
+                Task::none()
             }
             Message::UrlInputChanged(url) => {
                 self.url_input = url;
                 self.url_input_valid = validators::is_valid_url(&self.url_input);
             }
-            Message::SendRequest => {
-                // TODO
-            }
             Message::HeaderKeyChanged(index, key) => {
                 if let Some(header) = self.header_input.get_mut(index) {
                     header.0 = key;
                 }
+                Task::none()
             }
             Message::HeaderValueChanged(index, value) => {
                 if let Some(header) = self.header_input.get_mut(index) {
                     header.1 = value;
                 }
+                Task::none()
             }
             Message::AddHeader => {
                 self.header_input.push((String::new(), String::new()));
+                Task::none()
             }
-            _ => {} // TODO: REmove this. Unnecessary if all implemented and enum is non-exhaustive
+            Message::RemoveHeader(index) => {
+                self.header_input.remove(index);
+                Task::none()
+            }
+            Message::SendRequest => {
+                self.url_input_valid = GUI::is_valid_url(&self.url_input);
+
+                let mut headers = HeaderMap::new();
+                for (key, value) in self.header_input.iter() {
+                    if key.is_empty() {
+                        continue;
+                    }
+
+                    headers.insert(HeaderName::from_lowercase(key.to_lowercase().as_ref()).unwrap(), value.parse().unwrap());
+                }
+
+                let request = requests::build_request(
+                    &self.client,
+                    self.url_input.parse().unwrap(),
+                    HashMap::new(),  // TODO: query
+                    self.method_selected.clone().unwrap(),
+                    headers,
+                    Body::from(String::new()),
+                );
+
+                let handles = send_requests(vec![request]);
+                let handle = handles.into_iter().nth(0).unwrap();
+                Task::perform(
+                    async move {
+                        handle.await.unwrap().unwrap().text().await
+                    }, |result| match result {
+                        Ok(response) => {
+                            println!("{}", response);
+                            Message::ResponseBodyChanged(response)
+                        },
+                        Err(error) => {
+                            Message::ResponseBodyChanged(error.to_string())
+                        }
+                    }
+                )
+            }
+            Message::ResponseBodyChanged(response) => {
+                self.response_body = Some(response);
+                Task::none()
+            }
         }
     }
 
