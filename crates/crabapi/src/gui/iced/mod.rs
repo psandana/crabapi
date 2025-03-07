@@ -6,14 +6,13 @@ use crate::core::requests;
 use crate::core::requests::{Method, constants, send_requests, validators};
 use http::{HeaderMap, HeaderName};
 use iced;
-use iced::widget::text_editor::{Action, Content};
+use iced::widget::column;
 use iced::widget::text_editor;
-use iced::widget::{column};
+use iced::widget::text_editor::{Action, Content};
 use iced::{Element, Task};
 use reqwest::{Body, Client};
 use std::path::PathBuf;
 use std::sync::Arc;
-
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -236,7 +235,6 @@ impl GUI {
         ]
         .into()
     }
-
 }
 
 impl Default for GUI {

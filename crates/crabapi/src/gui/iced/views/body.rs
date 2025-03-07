@@ -1,5 +1,5 @@
-use super::GUI;
 use super::super::BodyType;
+use super::GUI;
 use crate::gui::iced::{Message, default_styles};
 use iced::widget::{Button, Row, Space, Text, column, container, radio, row, text_editor};
 use iced::{Center, Element, Length};

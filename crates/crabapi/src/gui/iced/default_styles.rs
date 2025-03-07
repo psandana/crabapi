@@ -1,15 +1,22 @@
+#[allow(unused_imports)]
+use iced::{Border, Color, Padding, Pixels, border::Radius};
+
+/// Font size for inputs and buttons
 pub const fn input_size_as_f32() -> f32 {
-    20.0
+    22.0 // Slightly larger for better readability
 }
 
-pub const fn input_size() -> iced::Pixels {
-    iced::Pixels(input_size_as_f32())
+/// Font size wrapper
+pub const fn input_size() -> Pixels {
+    Pixels(input_size_as_f32())
 }
 
-pub const fn padding() -> iced::Padding {
-    iced::Padding::new(10.0)
+/// Padding for UI elements
+pub const fn padding() -> Padding {
+    Padding::new(12.0) // Increased padding for better spacing
 }
 
-pub const fn spacing() -> iced::Pixels {
-    iced::Pixels(10.0)
+/// Spacing between elements
+pub const fn spacing() -> Pixels {
+    Pixels(12.0)
 }
