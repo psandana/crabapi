@@ -1,18 +1,18 @@
-// internal mods
 mod default_styles;
+mod file;
+mod views;
 
-use http::{HeaderMap, HeaderName};
-// dependencies
 use crate::core::requests;
-use iced;
-use iced::widget::text_editor::{Action, Content};
-use iced::widget::{Button, Row, Text, TextInput, scrollable, text_editor};
-use iced::widget::{column, container, pick_list, row};
-use iced::{Alignment, Center, Element, Length, Task};
-use iced_highlighter::Highlighter;
-use reqwest::{Body, Client};
-// internal dependencies
 use crate::core::requests::{Method, constants, send_requests, validators};
+use http::{HeaderMap, HeaderName};
+use iced;
+use iced::widget::column;
+use iced::widget::text_editor;
+use iced::widget::text_editor::{Action, Content};
+use iced::{Element, Task};
+use reqwest::{Body, Client};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -27,6 +27,17 @@ enum Message {
     SendRequest,
     ResponseBodyChanged(String),
     ResponseBodyText(Action),
+    BodyTypeChanged(BodyType),
+    BodyContentChanged(text_editor::Action),
+    BodyContentOpenFile,
+    BodyContentFileOpened(Result<(PathBuf, Arc<String>), file::FileOpenDialogError>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyType {
+    Empty,
+    File,
+    Text,
 }
 
 #[derive(Debug, Clone)]
@@ -48,9 +59,11 @@ struct GUI {
     query_input: Vec<(String, String)>,
     header_input: Vec<(String, String)>,
     response_body: Content,
+    body_content: text_editor::Content,
+    body_type_select: Option<BodyType>,
+    body_file_path: Option<PathBuf>,
+    body_file_content: Option<Arc<String>>,
 }
-
-mod views;
 
 impl GUI {
     fn new() -> Self {
@@ -63,6 +76,10 @@ impl GUI {
             query_input: vec![(String::new(), String::new())],
             header_input: vec![(String::new(), String::new())],
             response_body: Content::with_text("Response body will go here..."),
+            body_content: text_editor::Content::default(),
+            body_type_select: Some(BodyType::Text),
+            body_file_path: None,
+            body_file_content: None,
         }
     }
 
@@ -138,6 +155,33 @@ impl GUI {
 
                 Task::none()
             }
+            Message::BodyTypeChanged(body_type) => {
+                self.body_type_select = Some(body_type);
+                Task::none()
+            }
+            Message::BodyContentChanged(action) => {
+                self.body_content.perform(action);
+                Task::none()
+            }
+            Message::BodyContentOpenFile => {
+                Task::perform(file::open_file(), Message::BodyContentFileOpened)
+            }
+            Message::BodyContentFileOpened(result) => {
+                match result {
+                    Ok((path, content)) => {
+                        self.body_file_content = Some(content);
+                        self.body_file_path = Some(path);
+                    }
+                    Err(error) => {
+                        // TODO: use tracing
+                        println!("Error opening file: {:?}", error);
+                        if let file::FileOpenDialogError::IoError(kind) = error {
+                            println!("Error kind: {:?}", kind);
+                        }
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -171,7 +215,10 @@ impl GUI {
         let request_row = self.view_request();
 
         // ROW: Headers
-        let headers_column = self.view_request_headers();
+        let headers_row = self.view_request_headers();
+
+        // ROW: Body
+        let body_row = self.view_request_body();
 
         // ROW: Queries
         let queries_column = self.view_request_queries();
@@ -181,95 +228,13 @@ impl GUI {
 
         column![
             request_row,
-            container(headers_column)
-                .width(Length::Fill)
-                .padding(default_styles::padding()),
-            container(queries_column)
-                .width(Length::Fill)
-                .padding(default_styles::padding()),
-            container(response_row)
-                .align_x(Center)
-                .width(Length::Fill)
-                .padding(default_styles::padding()),
+            headers_row,
+            body_row,
+            queries_column,
+            response_row
         ]
         .into()
     }
-
-    fn view_request(&self) -> Element<Message> {
-        let url_input = self.view_request_url_input();
-
-        let method_input = self.view_request_method_input();
-
-        let send_button = Self::view_request_send_button();
-
-        let request_row = Self::view_request_row_setup(row![method_input, url_input, send_button]);
-
-        request_row.into()
-    }
-
-    // VIEW REQUEST - GENERAL
-
-    fn view_request_url_input(&self) -> Element<Message> {
-        let url_input_icon = Self::view_request_url_input_icon(self.url_input_valid);
-        let url_input = TextInput::new("Enter URI", &self.url_input)
-            .on_input(Message::UrlInputChanged)
-            .size(default_styles::input_size())
-            .icon(url_input_icon)
-            .width(Length::Fill);
-
-        url_input.into()
-    }
-
-    fn view_request_url_input_icon(valid: bool) -> iced::widget::text_input::Icon<iced::Font> {
-        iced::widget::text_input::Icon {
-            font: iced::Font::default(),
-            code_point: if valid { '✅' } else { '❌' },
-            size: Some(default_styles::input_size()),
-            spacing: 0.0,
-            side: iced::widget::text_input::Side::Right,
-        }
-    }
-
-    fn view_request_method_input(&self) -> Element<Message> {
-        pick_list(
-            self.methods,
-            self.method_selected.clone(),
-            Message::MethodChanged,
-        )
-        .placeholder("Method")
-        .width(Length::Shrink)
-        .text_size(default_styles::input_size())
-        .into()
-    }
-
-    fn view_request_row_setup(request_row: Row<'_, Message>) -> Row<'_, Message> {
-        request_row
-        .spacing(default_styles::spacing())
-        .padding(default_styles::padding())
-        .align_y(Alignment::Center)
-        .width(Length::Fill)  // Stretch the row
-    }
-
-    fn view_request_send_button() -> Element<'static, Message> {
-        Button::new(Text::new("Send").size(default_styles::input_size()))
-            .on_press(Message::SendRequest)
-            .into()
-    }
-
-    fn view_response(&self) -> Element<'_, Message> {
-        let label = Text::new("Response:").size(default_styles::input_size());
-        let body = text_editor(&self.response_body)
-            .on_action(Message::ResponseBodyText)
-            .highlight_with::<Highlighter>(
-                iced_highlighter::Settings {
-                    theme: iced_highlighter::Theme::SolarizedDark,
-                    token: "html".to_string(),
-                },
-                |highlight, _theme| highlight.to_format(),
-            );
-        column![label, scrollable(body)].into()
-    }
-    
 }
 
 impl Default for GUI {

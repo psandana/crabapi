@@ -1,10 +1,17 @@
 use super::GUI;
 use crate::gui::iced::{Message, TupleEvent, default_styles};
-use iced::widget::{Button, Text, TextInput, row};
+use iced::widget::{Button, Text, TextInput, container, row};
 use iced::{Element, Length};
 
 impl GUI {
     pub fn view_request_headers(&self) -> Element<Message> {
+        container(self.view_request_headers_inner())
+            .width(Length::Fill)
+            .padding(default_styles::padding())
+            .into()
+    }
+
+    fn view_request_headers_inner(&self) -> Element<Message> {
         let headers_title = Self::view_request_headers_title();
 
         let headers_column = self.view_request_headers_column();
@@ -17,7 +24,9 @@ impl GUI {
     }
 
     fn view_request_headers_title() -> Element<'static, Message> {
-        Text::new("Headers").size(16).into()
+        Text::new("Headers")
+            .size(default_styles::input_size())
+            .into()
     }
 
     fn view_request_headers_column(&self) -> Element<Message> {
