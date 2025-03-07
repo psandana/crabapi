@@ -1,10 +1,9 @@
 // internal mods
 mod default_styles;
 
-use http::{HeaderMap, HeaderName};
-use std::collections::HashMap;
-// dependencies
 use crate::core::requests;
+use crate::core::requests::{Method, constants, send_requests, validators};
+use http::{HeaderMap, HeaderName};
 use iced;
 use iced::widget::text_editor::{Action, Content};
 use iced::widget::{Button, Row, Text, TextInput};
@@ -12,8 +11,10 @@ use iced::widget::{button, column, container, pick_list, radio, row, scrollable,
 use iced::{Alignment, Center, Element, Length, Task};
 use iced_highlighter::Highlighter;
 use reqwest::{Body, Client};
-// internal dependencies
-use crate::core::requests::{Method, constants, send_requests, validators};
+use std::collections::HashMap;
+use std::io;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -32,6 +33,8 @@ enum Message {
     ResponseBodyText(Action),
     BodyTypeChanged(BodyType),
     BodyContentChanged(text_editor::Action),
+    BodyContentOpenFile,
+    BodyContentFileOpened(Result<(PathBuf, Arc<String>), FileOpenDialogError>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +42,12 @@ enum BodyType {
     Empty,
     File,
     Text,
+}
+
+#[derive(Debug, Clone)]
+pub enum FileOpenDialogError {
+    DialogClosed,
+    IoError(io::ErrorKind),
 }
 
 #[derive(Debug)]
@@ -53,6 +62,8 @@ struct GUI {
     response_body: Content,
     body_content: text_editor::Content,
     body_type_select: Option<BodyType>,
+    body_file_path: Option<PathBuf>,
+    body_file_content: Option<Arc<String>>,
 }
 
 impl GUI {
@@ -67,6 +78,8 @@ impl GUI {
             response_body: Content::with_text("Response body will go here..."),
             body_content: text_editor::Content::default(),
             body_type_select: Some(BodyType::Text),
+            body_file_path: None,
+            body_file_content: None,
         }
     }
 
@@ -154,12 +167,30 @@ impl GUI {
                 Task::none()
             }
             Message::BodyTypeChanged(body_type) => {
-                println!("Body Type Changed: {:?}", body_type);
                 self.body_type_select = Some(body_type);
                 Task::none()
             }
             Message::BodyContentChanged(action) => {
                 self.body_content.perform(action);
+                Task::none()
+            }
+            Message::BodyContentOpenFile => {
+                Task::perform(open_file(), Message::BodyContentFileOpened)
+            }
+            Message::BodyContentFileOpened(result) => {
+                match result {
+                    Ok((path, content)) => {
+                        self.body_file_content = Some(content);
+                        self.body_file_path = Some(path);
+                    }
+                    Err(error) => {
+                        // TODO: use tracing
+                        println!("Error opening file: {:?}", error);
+                        if let FileOpenDialogError::IoError(kind) = error {
+                            println!("Error kind: {:?}", kind);
+                        }
+                    }
+                }
                 Task::none()
             }
         }
@@ -346,7 +377,7 @@ impl GUI {
 
         let content = match self.body_type_select {
             Some(BodyType::Empty) => row![],
-            Some(BodyType::File) => row![],
+            Some(BodyType::File) => self.view_request_body_file(),
             Some(BodyType::Text) => self.view_request_body_text(),
             None => row![],
         };
@@ -364,9 +395,31 @@ impl GUI {
     }
 
     fn view_request_body_text(&self) -> Row<Message> {
-        row![text_editor(&self.body_content)
-            .on_action(Message::BodyContentChanged)
-            .placeholder("Introduce body here...") ]
+        row![
+            text_editor(&self.body_content)
+                .on_action(Message::BodyContentChanged)
+                .placeholder("Introduce body here...")
+        ]
+    }
+
+    fn view_request_body_file(&self) -> Row<Message> {
+        let file_name_string = format!(
+            "File: {}",
+            self.body_file_path
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_string())
+                .unwrap_or_else(|| "No file selected".to_string())
+        );
+        row![
+            Self::view_request_body_text_button(),
+            Text::new(file_name_string).size(default_styles::input_size())
+        ]
+    }
+
+    fn view_request_body_text_button() -> Element<'static, Message> {
+        Button::new(Text::new("Select File").size(default_styles::input_size()))
+            .on_press(Message::BodyContentOpenFile)
+            .into()
     }
 
     // VIEW RESPONSE
@@ -398,4 +451,27 @@ impl Default for GUI {
     fn default() -> Self {
         GUI::new()
     }
+}
+
+async fn open_file() -> Result<(PathBuf, Arc<String>), FileOpenDialogError> {
+    let picked_file = rfd::AsyncFileDialog::new()
+        .set_title("Open a file...")
+        .pick_file()
+        .await
+        .ok_or(FileOpenDialogError::DialogClosed)?;
+
+    load_file(picked_file).await
+}
+
+async fn load_file(
+    path: impl Into<PathBuf>,
+) -> Result<(PathBuf, Arc<String>), FileOpenDialogError> {
+    let path = path.into();
+
+    let contents = tokio::fs::read_to_string(&path)
+        .await
+        .map(Arc::new)
+        .map_err(|error| FileOpenDialogError::IoError(error.kind()))?;
+
+    Ok((path, contents))
 }
