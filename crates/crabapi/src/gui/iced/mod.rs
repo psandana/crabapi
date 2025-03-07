@@ -1,14 +1,19 @@
 // internal mods
 mod default_styles;
 
+use http::{HeaderMap, HeaderName};
+use std::collections::HashMap;
 // dependencies
+use crate::core::requests;
 use iced;
-use iced::widget::{Button, Row, Text, TextInput};
+use iced::widget::text_editor::{Action, Content};
+use iced::widget::{Button, Row, Text, TextInput, scrollable, text_editor};
 use iced::widget::{button, column, container, pick_list, row};
-use iced::{Alignment, Element, Length};
-
+use iced::{Alignment, Center, Element, Length, Task};
+use iced_highlighter::Highlighter;
+use reqwest::{Body, Client};
 // internal dependencies
-use crate::core::requests::{Method, constants, validators};
+use crate::core::requests::{Method, constants, send_requests, validators};
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -18,32 +23,37 @@ pub fn init() {
 enum Message {
     MethodChanged(Method),
     UrlInputChanged(String),
-    SendRequest,
     HeaderKeyChanged(usize, String),
     HeaderValueChanged(usize, String),
-    #[allow(dead_code)] // TODO: Remove this out-out warning
     RemoveHeader(usize),
     AddHeader,
+    SendRequest,
+    ResponseBodyChanged(String),
+    ResponseBodyText(Action),
 }
 
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 struct GUI {
+    client: Client,
     methods: &'static [Method],
     method_selected: Option<Method>,
     url_input: String,
     url_input_valid: bool,
     header_input: Vec<(String, String)>,
+    response_body: Content,
 }
 
 impl GUI {
     fn new() -> Self {
         Self {
+            client: Client::new(),
             methods: &constants::METHODS,
             method_selected: Some(Method::GET),
             url_input: String::new(),
             url_input_valid: false,
             header_input: vec![(String::new(), String::new())],
+            response_body: Content::with_text("Response body will go here..."),
         }
     }
 
@@ -51,32 +61,85 @@ impl GUI {
         crate::core::app::constants::APP_NAME.to_string()
     }
 
-    fn update(&mut self, event: Message) {
+    fn update(&mut self, event: Message) -> Task<Message> {
         match event {
             Message::MethodChanged(method) => {
                 self.method_selected = Some(method);
+                Task::none()
             }
             Message::UrlInputChanged(url) => {
                 self.url_input = url;
                 self.url_input_valid = validators::is_valid_url(&self.url_input);
-            }
-            Message::SendRequest => {
-                // TODO
+                Task::none()
             }
             Message::HeaderKeyChanged(index, key) => {
                 if let Some(header) = self.header_input.get_mut(index) {
                     header.0 = key;
                 }
+                Task::none()
             }
             Message::HeaderValueChanged(index, value) => {
                 if let Some(header) = self.header_input.get_mut(index) {
                     header.1 = value;
                 }
+                Task::none()
             }
             Message::AddHeader => {
                 self.header_input.push((String::new(), String::new()));
+                Task::none()
             }
-            _ => {} // TODO: REmove this. Unnecessary if all implemented and enum is non-exhaustive
+            Message::RemoveHeader(index) => {
+                self.header_input.remove(index);
+                Task::none()
+            }
+            Message::SendRequest => {
+                self.url_input_valid = validators::is_valid_url(&self.url_input);
+
+                let mut headers = HeaderMap::new();
+                for (key, value) in self.header_input.iter() {
+                    if key.is_empty() {
+                        continue;
+                    }
+
+                    headers.insert(
+                        HeaderName::from_lowercase(key.to_lowercase().as_ref()).unwrap(),
+                        value.parse().unwrap(),
+                    );
+                }
+
+                let request = requests::build_request(
+                    &self.client,
+                    self.url_input.parse().unwrap(),
+                    HashMap::new(), // TODO: query
+                    self.method_selected.clone().unwrap(),
+                    headers,
+                    Body::from(String::new()),
+                );
+
+                let handles = send_requests(vec![request]);
+                let handle = handles.into_iter().nth(0).unwrap();
+                Task::perform(
+                    async move { handle.await.unwrap().unwrap().text().await },
+                    |result| match result {
+                        Ok(response) => Message::ResponseBodyChanged(response),
+                        Err(error) => Message::ResponseBodyChanged(error.to_string()),
+                    },
+                )
+            }
+            Message::ResponseBodyChanged(response) => {
+                self.response_body = Content::with_text(&response);
+                Task::none()
+            }
+            Message::ResponseBodyText(action) => {
+                match action {
+                    Action::Edit(_text) => {}
+                    _ => {
+                        self.response_body.perform(action);
+                    }
+                }
+
+                Task::none()
+            }
         }
     }
 
@@ -87,11 +150,18 @@ impl GUI {
         // ROW: Headers
         let headers_column = self.view_request_headers();
 
+        // ROW: Response
+        let response_row = self.view_response();
+
         column![
             request_row,
             container(headers_column)
                 .width(Length::Fill)
-                .padding(default_styles::padding())
+                .padding(default_styles::padding()),
+            container(response_row)
+                .align_x(Center)
+                .width(Length::Fill)
+                .padding(default_styles::padding()),
         ]
         .into()
     }
@@ -208,6 +278,20 @@ impl GUI {
         Button::new(Text::new("Add Header").size(default_styles::input_size()))
             .on_press(Message::AddHeader)
             .into()
+    }
+
+    fn view_response(&self) -> Element<'_, Message> {
+        let label = Text::new("Response:").size(default_styles::input_size());
+        let body = text_editor(&self.response_body)
+            .on_action(Message::ResponseBodyText)
+            .highlight_with::<Highlighter>(
+                iced_highlighter::Settings {
+                    theme: iced_highlighter::Theme::SolarizedDark,
+                    token: "html".to_string(),
+                },
+                |highlight, _theme| highlight.to_format(),
+            );
+        column![label, scrollable(body)].into()
     }
 }
 
