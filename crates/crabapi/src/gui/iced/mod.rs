@@ -6,7 +6,7 @@ use crate::core::requests::{Method, constants, send_requests, validators};
 use http::{HeaderMap, HeaderName};
 use iced;
 use iced::widget::text_editor::{Action, Content};
-use iced::widget::{Button, Row, Text, TextInput};
+use iced::widget::{Button, Row, Space, Text, TextInput};
 use iced::widget::{button, column, container, pick_list, radio, row, scrollable, text_editor};
 use iced::{Alignment, Center, Element, Length, Task};
 use iced_highlighter::Highlighter;
@@ -359,13 +359,9 @@ impl GUI {
 
         let content = self.view_request_body_content();
 
-        column!(
-            body_title,
-            radio_buttons,
-            content,
-        )
-        .spacing(default_styles::spacing())
-        .into()
+        column!(body_title, radio_buttons, content,)
+            .spacing(default_styles::spacing())
+            .into()
     }
 
     fn view_request_body_title() -> Element<'static, Message> {
@@ -412,6 +408,7 @@ impl GUI {
             text_editor(&self.body_content)
                 .on_action(Message::BodyContentChanged)
                 .placeholder("Introduce body here...")
+                .size(default_styles::input_size())
         ]
     }
 
@@ -423,10 +420,13 @@ impl GUI {
                 .map(|path| path.to_string_lossy().to_string())
                 .unwrap_or_else(|| "No file selected".to_string())
         );
+
         row![
             Self::view_request_body_text_button(),
+            Space::new(default_styles::input_size(), default_styles::input_size()),
             Text::new(file_name_string).size(default_styles::input_size())
         ]
+        .align_y(Center)
     }
 
     fn view_request_body_text_button() -> Element<'static, Message> {
