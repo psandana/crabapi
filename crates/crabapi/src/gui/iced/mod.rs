@@ -213,6 +213,8 @@ impl GUI {
     }
 
     fn view_request(&self) -> Element<Message> {
+        let title_row = Self::view_request_row_setup(row![Self::view_request_title()]);
+
         let url_input = self.view_request_url_input();
 
         let method_input = self.view_request_method_input();
@@ -220,8 +222,6 @@ impl GUI {
         let send_button = Self::view_request_send_button();
 
         let request_row = Self::view_request_row_setup(row![method_input, url_input, send_button]);
-
-        let title_row = Self::view_request_row_setup(row![Self::view_request_title()]);
 
         column![title_row, request_row].into()
     }
@@ -355,6 +355,24 @@ impl GUI {
     fn view_request_body_inner(&self) -> Element<Message> {
         let body_title = Self::view_request_body_title();
 
+        let radio_buttons = self.view_request_body_radio_buttons();
+
+        let content = self.view_request_body_content();
+
+        column!(
+            body_title,
+            radio_buttons,
+            content,
+        )
+        .spacing(default_styles::spacing())
+        .into()
+    }
+
+    fn view_request_body_title() -> Element<'static, Message> {
+        Text::new("Body").size(default_styles::input_size()).into()
+    }
+
+    fn view_request_body_radio_buttons(&self) -> Row<Message> {
         let empty = radio(
             "Empty",
             BodyType::Empty,
@@ -375,6 +393,10 @@ impl GUI {
             Message::BodyTypeChanged,
         );
 
+        row![empty, text, file].spacing(default_styles::spacing())
+    }
+
+    fn view_request_body_content(&self) -> Row<Message> {
         let content = match self.body_type_select {
             Some(BodyType::Empty) => row![],
             Some(BodyType::File) => self.view_request_body_file(),
@@ -382,16 +404,7 @@ impl GUI {
             None => row![],
         };
 
-        column!(
-            body_title,
-            row![empty, text, file].spacing(default_styles::spacing()),
-            content,
-        )
-        .into()
-    }
-
-    fn view_request_body_title() -> Element<'static, Message> {
-        Text::new("Body").size(default_styles::input_size()).into()
+        content
     }
 
     fn view_request_body_text(&self) -> Row<Message> {
