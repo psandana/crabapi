@@ -269,29 +269,6 @@ impl GUI {
             );
         column![label, scrollable(body)].into()
     }
-
-    fn view_response_body(&self) -> Element<Message> {
-        let response_label = Text::new("Response Body:")
-            .size(18);
-            //.style(iced::theme::Text::Color(default_styles::button_color()));
-    
-        let response_box = iced::widget::text_input::TextInput::new("Response will appear here", &self.response_body)
-            .size(default_styles::input_size())
-            .width(Length::Fill)
-            .padding(default_styles::padding());
-
-         // Wrap response box in a container and control height
-        let response_container = container(response_box)
-            .width(Length::Fill)
-            .height(Length::Fill) // Set fixed height for response box
-            .padding(default_styles::padding());
-    
-        column![response_label, response_container]
-            .spacing(default_styles::spacing())
-            .padding(default_styles::padding())
-            .height(Length::Fill) // Set fixed height for response section
-            .into()
-    }
     
 }
 
