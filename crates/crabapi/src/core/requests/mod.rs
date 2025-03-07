@@ -2,7 +2,6 @@ pub mod constants;
 pub mod validators;
 
 use reqwest::{Body, Client, Error, RequestBuilder, Response};
-use std::collections::HashMap;
 use tokio::task::JoinHandle;
 
 pub use http::{HeaderMap, Method};
@@ -12,7 +11,7 @@ pub use reqwest::Url;
 pub fn build_request(
     client: &Client,
     url: Url,
-    query: HashMap<String, String>,
+    query: Vec<(String, String)>,
     method: Method,
     headers: HeaderMap,
     body: Body,

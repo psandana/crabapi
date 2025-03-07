@@ -2,7 +2,6 @@
 mod default_styles;
 
 use http::{HeaderMap, HeaderName};
-use std::collections::HashMap;
 // dependencies
 use crate::core::requests;
 use iced;
@@ -23,13 +22,19 @@ pub fn init() {
 enum Message {
     MethodChanged(Method),
     UrlInputChanged(String),
-    HeaderKeyChanged(usize, String),
-    HeaderValueChanged(usize, String),
-    RemoveHeader(usize),
-    AddHeader,
+    HeaderInputChanged(TupleEvent),
+    QueryInputChanged(TupleEvent),
     SendRequest,
     ResponseBodyChanged(String),
     ResponseBodyText(Action),
+}
+
+#[derive(Debug, Clone)]
+enum TupleEvent {
+    KeyChanged(usize, String),
+    ValueChanged(usize, String),
+    Remove(usize),
+    Add,
 }
 
 #[derive(Debug)]
@@ -40,6 +45,7 @@ struct GUI {
     method_selected: Option<Method>,
     url_input: String,
     url_input_valid: bool,
+    query_input: Vec<(String, String)>,
     header_input: Vec<(String, String)>,
     response_body: Content,
 }
@@ -52,6 +58,7 @@ impl GUI {
             method_selected: Some(Method::GET),
             url_input: String::new(),
             url_input_valid: false,
+            query_input: vec![(String::new(), String::new())],
             header_input: vec![(String::new(), String::new())],
             response_body: Content::with_text("Response body will go here..."),
         }
@@ -72,28 +79,17 @@ impl GUI {
                 self.url_input_valid = validators::is_valid_url(&self.url_input);
                 Task::none()
             }
-            Message::HeaderKeyChanged(index, key) => {
-                if let Some(header) = self.header_input.get_mut(index) {
-                    header.0 = key;
-                }
-                Task::none()
+            Message::HeaderInputChanged(header_message) => {
+                Self::update_tuple(&mut self.header_input, header_message)
             }
-            Message::HeaderValueChanged(index, value) => {
-                if let Some(header) = self.header_input.get_mut(index) {
-                    header.1 = value;
-                }
-                Task::none()
-            }
-            Message::AddHeader => {
-                self.header_input.push((String::new(), String::new()));
-                Task::none()
-            }
-            Message::RemoveHeader(index) => {
-                self.header_input.remove(index);
-                Task::none()
+            Message::QueryInputChanged(query_message) => {
+                Self::update_tuple(&mut self.query_input, query_message)
             }
             Message::SendRequest => {
                 self.url_input_valid = validators::is_valid_url(&self.url_input);
+                if !self.url_input_valid {
+                    return Task::none();
+                }
 
                 let mut headers = HeaderMap::new();
                 for (key, value) in self.header_input.iter() {
@@ -110,7 +106,7 @@ impl GUI {
                 let request = requests::build_request(
                     &self.client,
                     self.url_input.parse().unwrap(),
-                    HashMap::new(), // TODO: query
+                    self.query_input.clone(),
                     self.method_selected.clone().unwrap(),
                     headers,
                     Body::from(String::new()),
@@ -143,6 +139,31 @@ impl GUI {
         }
     }
 
+    fn update_tuple(tuple_vec: &mut Vec<(String, String)>, message: TupleEvent) -> Task<Message> {
+        match message {
+            TupleEvent::KeyChanged(index, key) => {
+                if let Some(tuple) = tuple_vec.get_mut(index) {
+                    tuple.0 = key;
+                }
+                Task::none()
+            }
+            TupleEvent::ValueChanged(index, value) => {
+                if let Some(tuple) = tuple_vec.get_mut(index) {
+                    tuple.1 = value;
+                }
+                Task::none()
+            }
+            TupleEvent::Add => {
+                tuple_vec.push((String::new(), String::new()));
+                Task::none()
+            }
+            TupleEvent::Remove(index) => {
+                tuple_vec.remove(index);
+                Task::none()
+            }
+        }
+    }
+
     fn view(&self) -> Element<Message> {
         // ROW: Method, URI, Send Button
         let request_row = self.view_request();
@@ -150,12 +171,18 @@ impl GUI {
         // ROW: Headers
         let headers_column = self.view_request_headers();
 
+        // ROW: Queries
+        let queries_column = self.view_request_queries();
+
         // ROW: Response
         let response_row = self.view_response();
 
         column![
             request_row,
             container(headers_column)
+                .width(Length::Fill)
+                .padding(default_styles::padding()),
+            container(queries_column)
                 .width(Length::Fill)
                 .padding(default_styles::padding()),
             container(response_row)
@@ -261,14 +288,20 @@ impl GUI {
     ) -> Element<Message> {
         row![
             TextInput::new("Key", &header.0)
-                .on_input(move |key| Message::HeaderKeyChanged(index, key))
+                .on_input(
+                    move |key| Message::HeaderInputChanged(TupleEvent::KeyChanged(index, key))
+                )
                 .width(Length::FillPortion(1)),
             TextInput::new("Value", &header.1) // TODO: Change unwrap
-                .on_input(move |value| Message::HeaderValueChanged(index, value))
+                .on_input(
+                    move |value| Message::HeaderInputChanged(TupleEvent::ValueChanged(
+                        index, value
+                    ))
+                )
                 .width(Length::FillPortion(2)),
             Button::new(Text::new("X"))
-                .on_press(Message::RemoveHeader(index))
-                .style(button::danger)
+                .on_press(Message::HeaderInputChanged(TupleEvent::Remove(index)))
+                .style(button::danger),
         ]
         .spacing(default_styles::spacing())
         .into()
@@ -276,7 +309,62 @@ impl GUI {
 
     fn view_request_headers_add_button() -> Element<'static, Message> {
         Button::new(Text::new("Add Header").size(default_styles::input_size()))
-            .on_press(Message::AddHeader)
+            .on_press(Message::HeaderInputChanged(TupleEvent::Add))
+            .into()
+    }
+
+    // VIEW REQUEST QUERIES
+    fn view_request_queries(&self) -> Element<Message> {
+        let queries_title = Self::view_request_queries_title();
+
+        let queries_column = self.view_request_queries_column();
+
+        let query_add_button = Self::view_request_queries_add_button();
+
+        column![queries_title, queries_column, query_add_button]
+            .spacing(default_styles::spacing())
+            .into()
+    }
+
+    fn view_request_queries_title() -> Element<'static, Message> {
+        Text::new("Queries").size(16).into()
+    }
+
+    fn view_request_queries_column(&self) -> Element<Message> {
+        let mut queries_column = column![];
+
+        for (i, query) in self.query_input.iter().enumerate() {
+            let header_row = self.view_request_queries_row(i, query);
+            queries_column = queries_column.push(header_row);
+        }
+        queries_column.spacing(default_styles::spacing()).into()
+    }
+
+    fn view_request_queries_row(
+        &self,
+        index: usize,
+        header: &(String, String),
+    ) -> Element<Message> {
+        row![
+            TextInput::new("Key", &header.0)
+                .on_input(move |key| Message::QueryInputChanged(TupleEvent::KeyChanged(index, key)))
+                .width(Length::FillPortion(1)),
+            TextInput::new("Value", &header.1) // TODO: Change unwrap
+                .on_input(
+                    move |value| Message::QueryInputChanged(TupleEvent::ValueChanged(index, value))
+                )
+                .width(Length::FillPortion(2)),
+            Button::new(Text::new("X"))
+                .on_press(Message::QueryInputChanged(TupleEvent::Remove(index)))
+                .style(button::danger),
+        ]
+        .spacing(default_styles::spacing())
+        .into()
+    }
+
+    fn view_request_queries_add_button() -> Element<'static, Message> {
+        Button::new(Text::new("Add Query").size(default_styles::input_size()))
+            .on_press(Message::QueryInputChanged(TupleEvent::Add))
             .into()
     }
 
