@@ -24,6 +24,7 @@ enum Message {
     #[allow(dead_code)] // TODO: Remove this out-out warning
     RemoveHeader(usize),
     AddHeader,
+    ResponseReceived(String),
 }
 
 #[derive(Debug)]
@@ -34,6 +35,7 @@ struct GUI {
     url_input: String,
     url_input_valid: bool,
     header_input: Vec<(String, String)>,
+    response_body: String,
 }
 
 impl GUI {
@@ -44,6 +46,7 @@ impl GUI {
             url_input: String::new(),
             url_input_valid: false,
             header_input: vec![(String::new(), String::new())],
+            response_body: String::new(),
         }
     }
 
@@ -62,6 +65,11 @@ impl GUI {
             }
             Message::SendRequest => {
                 // TODO
+                let mock_response = "Simulated response data...".to_string();
+                self.update(Message::ResponseReceived(mock_response));
+            }
+            Message::ResponseReceived(response) => {
+                self.response_body = response;
             }
             Message::HeaderKeyChanged(index, key) => {
                 if let Some(header) = self.header_input.get_mut(index) {
@@ -87,11 +95,16 @@ impl GUI {
         // ROW: Headers
         let headers_column = self.view_request_headers();
 
+        let response_body_section = self.view_response_body();
+
         column![
             request_row,
             container(headers_column)
                 .width(Length::Fill)
-                .padding(default_styles::padding())
+                .padding(default_styles::padding()),
+            container(response_body_section)
+                .width(Length::Fill)
+                .padding(default_styles::padding()) // Ensure spacing
         ]
         .into()
     }
@@ -145,9 +158,10 @@ impl GUI {
 
     fn view_request_row_setup(request_row: Row<'_, Message>) -> Row<'_, Message> {
         request_row
-            .spacing(default_styles::spacing())
-            .padding(default_styles::padding())
-            .align_y(Alignment::Center)
+        .spacing(default_styles::spacing())
+        .padding(default_styles::padding())
+        .align_y(Alignment::Center)
+        .width(Length::Fill)  // Stretch the row
     }
 
     fn view_request_send_button() -> Element<'static, Message> {
@@ -209,6 +223,30 @@ impl GUI {
             .on_press(Message::AddHeader)
             .into()
     }
+
+    fn view_response_body(&self) -> Element<Message> {
+        let response_label = Text::new("Response Body:")
+            .size(18);
+            //.style(iced::theme::Text::Color(default_styles::button_color()));
+    
+        let response_box = iced::widget::text_input::TextInput::new("Response will appear here", &self.response_body)
+            .size(default_styles::input_size())
+            .width(Length::Fill)
+            .padding(default_styles::padding());
+
+         // Wrap response box in a container and control height
+        let response_container = container(response_box)
+            .width(Length::Fill)
+            .height(Length::Fill) // Set fixed height for response box
+            .padding(default_styles::padding());
+    
+        column![response_label, response_container]
+            .spacing(default_styles::spacing())
+            .padding(default_styles::padding())
+            .height(Length::Fill) // Set fixed height for response section
+            .into()
+    }
+    
 }
 
 impl Default for GUI {
