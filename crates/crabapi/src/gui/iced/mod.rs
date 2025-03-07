@@ -1,18 +1,20 @@
 // internal mods
 mod default_styles;
+mod views;
 
 use http::{HeaderMap, HeaderName};
-// dependencies
 use crate::core::requests;
 use iced;
 use iced::widget::text_editor::{Action, Content};
-use iced::widget::{Button, Row, Text, TextInput, scrollable, text_editor};
-use iced::widget::{column, container, pick_list, row};
+use iced::widget::{Button, Row, Text, TextInput, container, scrollable, text_editor};
+use iced::widget::{column, pick_list, row};
 use iced::{Alignment, Center, Element, Length, Task};
 use iced_highlighter::Highlighter;
 use reqwest::{Body, Client};
-// internal dependencies
 use crate::core::requests::{Method, constants, send_requests, validators};
+use std::io;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -27,6 +29,23 @@ enum Message {
     SendRequest,
     ResponseBodyChanged(String),
     ResponseBodyText(Action),
+    BodyTypeChanged(BodyType),
+    BodyContentChanged(text_editor::Action),
+    BodyContentOpenFile,
+    BodyContentFileOpened(Result<(PathBuf, Arc<String>), FileOpenDialogError>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BodyType {
+    Empty,
+    File,
+    Text,
+}
+
+#[derive(Debug, Clone)]
+pub enum FileOpenDialogError {
+    DialogClosed,
+    IoError(io::ErrorKind),
 }
 
 #[derive(Debug, Clone)]
@@ -48,9 +67,11 @@ struct GUI {
     query_input: Vec<(String, String)>,
     header_input: Vec<(String, String)>,
     response_body: Content,
+    body_content: text_editor::Content,
+    body_type_select: Option<BodyType>,
+    body_file_path: Option<PathBuf>,
+    body_file_content: Option<Arc<String>>,
 }
-
-mod views;
 
 impl GUI {
     fn new() -> Self {
@@ -63,6 +84,10 @@ impl GUI {
             query_input: vec![(String::new(), String::new())],
             header_input: vec![(String::new(), String::new())],
             response_body: Content::with_text("Response body will go here..."),
+            body_content: text_editor::Content::default(),
+            body_type_select: Some(BodyType::Text),
+            body_file_path: None,
+            body_file_content: None,
         }
     }
 
@@ -138,6 +163,33 @@ impl GUI {
 
                 Task::none()
             }
+            Message::BodyTypeChanged(body_type) => {
+                self.body_type_select = Some(body_type);
+                Task::none()
+            }
+            Message::BodyContentChanged(action) => {
+                self.body_content.perform(action);
+                Task::none()
+            }
+            Message::BodyContentOpenFile => {
+                Task::perform(open_file(), Message::BodyContentFileOpened)
+            }
+            Message::BodyContentFileOpened(result) => {
+                match result {
+                    Ok((path, content)) => {
+                        self.body_file_content = Some(content);
+                        self.body_file_path = Some(path);
+                    }
+                    Err(error) => {
+                        // TODO: use tracing
+                        println!("Error opening file: {:?}", error);
+                        if let FileOpenDialogError::IoError(kind) = error {
+                            println!("Error kind: {:?}", kind);
+                        }
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -171,7 +223,10 @@ impl GUI {
         let request_row = self.view_request();
 
         // ROW: Headers
-        let headers_column = self.view_request_headers();
+        let headers_row = self.view_request_headers();
+
+        // ROW: Body
+        let body_row = self.view_request_body();
 
         // ROW: Queries
         let queries_column = self.view_request_queries();
@@ -179,23 +234,12 @@ impl GUI {
         // ROW: Response
         let response_row = self.view_response();
 
-        column![
-            request_row,
-            container(headers_column)
-                .width(Length::Fill)
-                .padding(default_styles::padding()),
-            container(queries_column)
-                .width(Length::Fill)
-                .padding(default_styles::padding()),
-            container(response_row)
-                .align_x(Center)
-                .width(Length::Fill)
-                .padding(default_styles::padding()),
-        ]
-        .into()
+        column![request_row, headers_row, body_row, queries_column, response_row].into()
     }
 
     fn view_request(&self) -> Element<Message> {
+        let title_row = Self::view_request_row_setup(row![Self::view_request_title()]);
+
         let url_input = self.view_request_url_input();
 
         let method_input = self.view_request_method_input();
@@ -204,10 +248,16 @@ impl GUI {
 
         let request_row = Self::view_request_row_setup(row![method_input, url_input, send_button]);
 
-        request_row.into()
+        column![title_row, request_row].into()
     }
 
     // VIEW REQUEST - GENERAL
+
+    fn view_request_title() -> Element<'static, Message> {
+        Text::new("Request")
+            .size(default_styles::input_size())
+            .into()
+    }
 
     fn view_request_url_input(&self) -> Element<Message> {
         let url_input_icon = Self::view_request_url_input_icon(self.url_input_valid);
@@ -255,7 +305,17 @@ impl GUI {
             .into()
     }
 
+    // VIEW - RESPONSE
+
     fn view_response(&self) -> Element<'_, Message> {
+        container(self.view_response_inner())
+            .align_x(Center)
+            .width(Length::Fill)
+            .padding(default_styles::padding())
+            .into()
+    }
+
+    fn view_response_inner(&self) -> Element<'_, Message> {
         let label = Text::new("Response:").size(default_styles::input_size());
         let body = text_editor(&self.response_body)
             .on_action(Message::ResponseBodyText)
@@ -266,7 +326,7 @@ impl GUI {
                 },
                 |highlight, _theme| highlight.to_format(),
             );
-        column![label, scrollable(body)].into()
+        column![label, scrollable(body)].spacing(default_styles::spacing()).into()
     }
 }
 
@@ -274,4 +334,27 @@ impl Default for GUI {
     fn default() -> Self {
         GUI::new()
     }
+}
+
+async fn open_file() -> Result<(PathBuf, Arc<String>), FileOpenDialogError> {
+    let picked_file = rfd::AsyncFileDialog::new()
+        .set_title("Open a file...")
+        .pick_file()
+        .await
+        .ok_or(FileOpenDialogError::DialogClosed)?;
+
+    load_file(picked_file).await
+}
+
+async fn load_file(
+    path: impl Into<PathBuf>,
+) -> Result<(PathBuf, Arc<String>), FileOpenDialogError> {
+    let path = path.into();
+
+    let contents = tokio::fs::read_to_string(&path)
+        .await
+        .map(Arc::new)
+        .map_err(|error| FileOpenDialogError::IoError(error.kind()))?;
+
+    Ok((path, contents))
 }

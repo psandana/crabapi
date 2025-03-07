@@ -1,23 +1,32 @@
 use super::GUI;
 use crate::gui::iced::{Message, TupleEvent, default_styles};
-use iced::widget::{Button, Text, TextInput, row};
+use iced::widget::{Button, Text, TextInput, column, container, row};
 use iced::{Element, Length};
 
 impl GUI {
     pub fn view_request_queries(&self) -> Element<Message> {
+        container(self.view_request_queries_inner())
+            .width(Length::Fill)
+            .padding(default_styles::padding())
+            .into()
+    }
+
+    pub fn view_request_queries_inner(&self) -> Element<Message> {
         let queries_title = Self::view_request_queries_title();
 
         let queries_column = self.view_request_queries_column();
 
         let query_add_button = Self::view_request_queries_add_button();
 
-        iced::widget::column![queries_title, queries_column, query_add_button]
+        column![queries_title, queries_column, query_add_button]
             .spacing(default_styles::spacing())
             .into()
     }
 
     fn view_request_queries_title() -> Element<'static, Message> {
-        Text::new("Queries").size(16).into()
+        Text::new("Queries")
+            .size(default_styles::input_size())
+            .into()
     }
 
     fn view_request_queries_column(&self) -> Element<Message> {
