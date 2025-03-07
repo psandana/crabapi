@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use crate::core::requests;
 use iced;
 use iced::widget::text_editor::{Action, Content};
-use iced::widget::{Button, Row, Text, TextInput, scrollable, text_editor};
-use iced::widget::{button, column, container, pick_list, radio, row};
+use iced::widget::{Button, Row, Text, TextInput};
+use iced::widget::{button, column, container, pick_list, radio, row, scrollable, text_editor};
 use iced::{Alignment, Center, Element, Length, Task};
 use iced_highlighter::Highlighter;
 use reqwest::{Body, Client};
@@ -31,10 +31,12 @@ enum Message {
     ResponseBodyChanged(String),
     ResponseBodyText(Action),
     BodyTypeChanged(BodyType),
+    BodyContentChanged(text_editor::Action),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BodyType {
+    Empty,
     File,
     Text,
 }
@@ -49,7 +51,7 @@ struct GUI {
     url_input_valid: bool,
     header_input: Vec<(String, String)>,
     response_body: Content,
-    // body_input: String,
+    body_content: text_editor::Content,
     body_type_select: Option<BodyType>,
 }
 
@@ -63,6 +65,7 @@ impl GUI {
             url_input_valid: false,
             header_input: vec![(String::new(), String::new())],
             response_body: Content::with_text("Response body will go here..."),
+            body_content: text_editor::Content::default(),
             body_type_select: Some(BodyType::Text),
         }
     }
@@ -153,6 +156,10 @@ impl GUI {
             Message::BodyTypeChanged(body_type) => {
                 println!("Body Type Changed: {:?}", body_type);
                 self.body_type_select = Some(body_type);
+                Task::none()
+            }
+            Message::BodyContentChanged(action) => {
+                self.body_content.perform(action);
                 Task::none()
             }
         }
@@ -315,30 +322,51 @@ impl GUI {
     }
 
     fn view_request_body_inner(&self) -> Element<Message> {
-      let body_title = Self::view_request_body_title();
+        let body_title = Self::view_request_body_title();
 
-      let text = radio(
-          "Text",
-          BodyType::Text,
-          self.body_type_select,
-          Message::BodyTypeChanged,
-      );
-      let file = radio(
-          "File",
-          BodyType::File,
-          self.body_type_select,
-          Message::BodyTypeChanged,
-      );
+        let empty = radio(
+            "Empty",
+            BodyType::Empty,
+            self.body_type_select,
+            Message::BodyTypeChanged,
+        );
 
-      column!(
-          body_title,
-          row![text, file].spacing(default_styles::spacing())
-      )
-      .into()
+        let text = radio(
+            "Text",
+            BodyType::Text,
+            self.body_type_select,
+            Message::BodyTypeChanged,
+        );
+        let file = radio(
+            "File",
+            BodyType::File,
+            self.body_type_select,
+            Message::BodyTypeChanged,
+        );
+
+        let content = match self.body_type_select {
+            Some(BodyType::Empty) => row![],
+            Some(BodyType::File) => row![],
+            Some(BodyType::Text) => self.view_request_body_text(),
+            None => row![],
+        };
+
+        column!(
+            body_title,
+            row![empty, text, file].spacing(default_styles::spacing()),
+            content,
+        )
+        .into()
     }
 
     fn view_request_body_title() -> Element<'static, Message> {
         Text::new("Body").size(default_styles::input_size()).into()
+    }
+
+    fn view_request_body_text(&self) -> Row<Message> {
+        row![text_editor(&self.body_content)
+            .on_action(Message::BodyContentChanged)
+            .placeholder("Introduce body here...") ]
     }
 
     // VIEW RESPONSE
