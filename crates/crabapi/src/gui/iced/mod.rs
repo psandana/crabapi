@@ -308,26 +308,33 @@ impl GUI {
     // VIEW REQUEST - BODY
 
     fn view_request_body(&self) -> Element<Message> {
-        let body_title = Self::view_request_body_title();
+        container(self.view_request_body_inner())
+            .width(Length::Fill)
+            .padding(default_styles::padding())
+            .into()
+    }
 
-        let text = radio(
-            "Text",
-            BodyType::Text,
-            self.body_type_select,
-            Message::BodyTypeChanged,
-        );
-        let file = radio(
-            "File",
-            BodyType::File,
-            self.body_type_select,
-            Message::BodyTypeChanged,
-        );
+    fn view_request_body_inner(&self) -> Element<Message> {
+      let body_title = Self::view_request_body_title();
 
-        column!(
-            body_title,
-            row![text, file].spacing(default_styles::spacing())
-        )
-        .into()
+      let text = radio(
+          "Text",
+          BodyType::Text,
+          self.body_type_select,
+          Message::BodyTypeChanged,
+      );
+      let file = radio(
+          "File",
+          BodyType::File,
+          self.body_type_select,
+          Message::BodyTypeChanged,
+      );
+
+      column!(
+          body_title,
+          row![text, file].spacing(default_styles::spacing())
+      )
+      .into()
     }
 
     fn view_request_body_title() -> Element<'static, Message> {
