@@ -6,10 +6,11 @@ use std::collections::HashMap;
 // dependencies
 use crate::core::requests;
 use iced;
-use iced::widget::text_editor::Content;
+use iced::widget::text_editor::{Action, Content};
 use iced::widget::{Button, Row, Text, TextInput, scrollable, text_editor};
 use iced::widget::{button, column, container, pick_list, row};
 use iced::{Alignment, Center, Element, Length, Task};
+use iced_highlighter::Highlighter;
 use reqwest::{Body, Client};
 // internal dependencies
 use crate::core::requests::{Method, constants, send_requests, validators};
@@ -28,8 +29,7 @@ enum Message {
     AddHeader,
     SendRequest,
     ResponseBodyChanged(String),
-    #[allow(dead_code)]
-    Edit(text_editor::Action),
+    ResponseBodyText(Action),
 }
 
 #[derive(Debug)]
@@ -130,7 +130,16 @@ impl GUI {
                 self.response_body = Content::with_text(&response);
                 Task::none()
             }
-            Message::Edit(_) => Task::none(),
+            Message::ResponseBodyText(action) => {
+                match action {
+                    Action::Edit(_text) => {}
+                    _ => {
+                        self.response_body.perform(action);
+                    }
+                }
+
+                Task::none()
+            }
         }
     }
 
@@ -273,8 +282,16 @@ impl GUI {
 
     fn view_response(&self) -> Element<'_, Message> {
         let label = Text::new("Response:").size(default_styles::input_size());
-        let body = scrollable(text_editor(&self.response_body).on_action(Message::Edit));
-        column![label, body].into()
+        let body = text_editor(&self.response_body)
+            .on_action(Message::ResponseBodyText)
+            .highlight_with::<Highlighter>(
+                iced_highlighter::Settings {
+                    theme: iced_highlighter::Theme::SolarizedDark,
+                    token: "html".to_string(),
+                },
+                |highlight, _theme| highlight.to_format(),
+            );
+        column![label, scrollable(body)].into()
     }
 }
 
