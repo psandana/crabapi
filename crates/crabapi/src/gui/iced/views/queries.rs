@@ -11,7 +11,7 @@ impl GUI {
             .into()
     }
 
-    pub fn view_request_queries_inner(&self) -> Element<Message> {
+    fn view_request_queries_inner(&self) -> Element<Message> {
         let queries_title = Self::view_request_queries_title();
 
         let queries_column = self.view_request_queries_column();

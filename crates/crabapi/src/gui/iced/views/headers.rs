@@ -11,7 +11,7 @@ impl GUI {
             .into()
     }
 
-    pub fn view_request_headers_inner(&self) -> Element<Message> {
+    fn view_request_headers_inner(&self) -> Element<Message> {
         let headers_title = Self::view_request_headers_title();
 
         let headers_column = self.view_request_headers_column();

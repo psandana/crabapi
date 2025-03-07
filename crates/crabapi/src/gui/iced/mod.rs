@@ -1,20 +1,19 @@
-// internal mods
 mod default_styles;
+mod file;
 mod views;
 
-use http::{HeaderMap, HeaderName};
 use crate::core::requests;
+use crate::core::requests::{Method, constants, send_requests, validators};
+use http::{HeaderMap, HeaderName};
 use iced;
 use iced::widget::text_editor::{Action, Content};
-use iced::widget::{Button, Row, Text, TextInput, container, scrollable, text_editor};
-use iced::widget::{column, pick_list, row};
-use iced::{Alignment, Center, Element, Length, Task};
-use iced_highlighter::Highlighter;
+use iced::widget::text_editor;
+use iced::widget::{column};
+use iced::{Element, Task};
 use reqwest::{Body, Client};
-use crate::core::requests::{Method, constants, send_requests, validators};
-use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
+
 
 pub fn init() {
     iced::run(GUI::title, GUI::update, GUI::view).unwrap()
@@ -32,7 +31,7 @@ enum Message {
     BodyTypeChanged(BodyType),
     BodyContentChanged(text_editor::Action),
     BodyContentOpenFile,
-    BodyContentFileOpened(Result<(PathBuf, Arc<String>), FileOpenDialogError>),
+    BodyContentFileOpened(Result<(PathBuf, Arc<String>), file::FileOpenDialogError>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,12 +39,6 @@ enum BodyType {
     Empty,
     File,
     Text,
-}
-
-#[derive(Debug, Clone)]
-pub enum FileOpenDialogError {
-    DialogClosed,
-    IoError(io::ErrorKind),
 }
 
 #[derive(Debug, Clone)]
@@ -172,7 +165,7 @@ impl GUI {
                 Task::none()
             }
             Message::BodyContentOpenFile => {
-                Task::perform(open_file(), Message::BodyContentFileOpened)
+                Task::perform(file::open_file(), Message::BodyContentFileOpened)
             }
             Message::BodyContentFileOpened(result) => {
                 match result {
@@ -183,7 +176,7 @@ impl GUI {
                     Err(error) => {
                         // TODO: use tracing
                         println!("Error opening file: {:?}", error);
-                        if let FileOpenDialogError::IoError(kind) = error {
+                        if let file::FileOpenDialogError::IoError(kind) = error {
                             println!("Error kind: {:?}", kind);
                         }
                     }
@@ -234,127 +227,20 @@ impl GUI {
         // ROW: Response
         let response_row = self.view_response();
 
-        column![request_row, headers_row, body_row, queries_column, response_row].into()
-    }
-
-    fn view_request(&self) -> Element<Message> {
-        let title_row = Self::view_request_row_setup(row![Self::view_request_title()]);
-
-        let url_input = self.view_request_url_input();
-
-        let method_input = self.view_request_method_input();
-
-        let send_button = Self::view_request_send_button();
-
-        let request_row = Self::view_request_row_setup(row![method_input, url_input, send_button]);
-
-        column![title_row, request_row].into()
-    }
-
-    // VIEW REQUEST - GENERAL
-
-    fn view_request_title() -> Element<'static, Message> {
-        Text::new("Request")
-            .size(default_styles::input_size())
-            .into()
-    }
-
-    fn view_request_url_input(&self) -> Element<Message> {
-        let url_input_icon = Self::view_request_url_input_icon(self.url_input_valid);
-        let url_input = TextInput::new("Enter URI", &self.url_input)
-            .on_input(Message::UrlInputChanged)
-            .size(default_styles::input_size())
-            .icon(url_input_icon)
-            .width(Length::Fill);
-
-        url_input.into()
-    }
-
-    fn view_request_url_input_icon(valid: bool) -> iced::widget::text_input::Icon<iced::Font> {
-        iced::widget::text_input::Icon {
-            font: iced::Font::default(),
-            code_point: if valid { '✅' } else { '❌' },
-            size: Some(default_styles::input_size()),
-            spacing: 0.0,
-            side: iced::widget::text_input::Side::Right,
-        }
-    }
-
-    fn view_request_method_input(&self) -> Element<Message> {
-        pick_list(
-            self.methods,
-            self.method_selected.clone(),
-            Message::MethodChanged,
-        )
-        .placeholder("Method")
-        .width(Length::Shrink)
-        .text_size(default_styles::input_size())
+        column![
+            request_row,
+            headers_row,
+            body_row,
+            queries_column,
+            response_row
+        ]
         .into()
     }
 
-    fn view_request_row_setup(request_row: Row<'_, Message>) -> Row<'_, Message> {
-        request_row
-            .spacing(default_styles::spacing())
-            .padding(default_styles::padding())
-            .align_y(Alignment::Center)
-    }
-
-    fn view_request_send_button() -> Element<'static, Message> {
-        Button::new(Text::new("Send").size(default_styles::input_size()))
-            .on_press(Message::SendRequest)
-            .into()
-    }
-
-    // VIEW - RESPONSE
-
-    fn view_response(&self) -> Element<'_, Message> {
-        container(self.view_response_inner())
-            .align_x(Center)
-            .width(Length::Fill)
-            .padding(default_styles::padding())
-            .into()
-    }
-
-    fn view_response_inner(&self) -> Element<'_, Message> {
-        let label = Text::new("Response:").size(default_styles::input_size());
-        let body = text_editor(&self.response_body)
-            .on_action(Message::ResponseBodyText)
-            .highlight_with::<Highlighter>(
-                iced_highlighter::Settings {
-                    theme: iced_highlighter::Theme::SolarizedDark,
-                    token: "html".to_string(),
-                },
-                |highlight, _theme| highlight.to_format(),
-            );
-        column![label, scrollable(body)].spacing(default_styles::spacing()).into()
-    }
 }
 
 impl Default for GUI {
     fn default() -> Self {
         GUI::new()
     }
-}
-
-async fn open_file() -> Result<(PathBuf, Arc<String>), FileOpenDialogError> {
-    let picked_file = rfd::AsyncFileDialog::new()
-        .set_title("Open a file...")
-        .pick_file()
-        .await
-        .ok_or(FileOpenDialogError::DialogClosed)?;
-
-    load_file(picked_file).await
-}
-
-async fn load_file(
-    path: impl Into<PathBuf>,
-) -> Result<(PathBuf, Arc<String>), FileOpenDialogError> {
-    let path = path.into();
-
-    let contents = tokio::fs::read_to_string(&path)
-        .await
-        .map(Arc::new)
-        .map_err(|error| FileOpenDialogError::IoError(error.kind()))?;
-
-    Ok((path, contents))
 }
