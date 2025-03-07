@@ -244,9 +244,10 @@ impl GUI {
 
     fn view_request_row_setup(request_row: Row<'_, Message>) -> Row<'_, Message> {
         request_row
-            .spacing(default_styles::spacing())
-            .padding(default_styles::padding())
-            .align_y(Alignment::Center)
+        .spacing(default_styles::spacing())
+        .padding(default_styles::padding())
+        .align_y(Alignment::Center)
+        .width(Length::Fill)  // Stretch the row
     }
 
     fn view_request_send_button() -> Element<'static, Message> {
@@ -268,6 +269,7 @@ impl GUI {
             );
         column![label, scrollable(body)].into()
     }
+    
 }
 
 impl Default for GUI {
