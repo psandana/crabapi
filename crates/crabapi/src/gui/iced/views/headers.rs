@@ -1,7 +1,7 @@
-use iced::{Element, Length};
-use iced::widget::{row, Button, Text, TextInput};
-use crate::gui::iced::{default_styles, Message, TupleEvent};
 use super::GUI;
+use crate::gui::iced::{Message, TupleEvent, default_styles};
+use iced::widget::{Button, Text, TextInput, row};
+use iced::{Element, Length};
 
 impl GUI {
     pub fn view_request_headers(&self) -> Element<Message> {
@@ -52,8 +52,8 @@ impl GUI {
                 .on_press(Message::HeaderInputChanged(TupleEvent::Remove(index)))
                 .style(iced::widget::button::danger),
         ]
-            .spacing(default_styles::spacing())
-            .into()
+        .spacing(default_styles::spacing())
+        .into()
     }
 
     fn view_request_headers_add_button() -> Element<'static, Message> {
@@ -61,5 +61,4 @@ impl GUI {
             .on_press(Message::HeaderInputChanged(TupleEvent::Add))
             .into()
     }
-
 }
