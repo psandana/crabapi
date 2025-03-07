@@ -6,7 +6,6 @@ use clap::{Arg, ArgAction, Command};
 use const_format::formatcp;
 use http::{HeaderMap, HeaderName, HeaderValue, Method};
 use reqwest::{Body, Client};
-use std::collections::HashMap;
 use std::error::Error;
 
 pub struct Cli {
@@ -89,11 +88,11 @@ impl Cli {
             return Ok(());
         }
 
-        let mut query = HashMap::new();
+        let mut query = vec![];
         if let Some(query_values) = matches.get_many::<String>("query") {
             for query_value in query_values {
                 if let Some((key, value)) = query_value.split_once(": ") {
-                    query.insert(key.to_string(), value.to_string());
+                    query.push((key.to_string(), value.to_string()));
                 }
             }
         }
